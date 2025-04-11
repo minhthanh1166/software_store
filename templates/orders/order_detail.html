@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Order #{{ order.id }} - Software Store{% endblock %}
+
+{% block content %}
+<div class="bg-white">
+    <div class="max-w-3xl mx-auto py-16 px-4 sm:py-24 sm:px-6 lg:px-8">
+        <div class="max-w-xl">
+            <h1 class="text-sm font-semibold uppercase tracking-wide text-indigo-600">Thank you!</h1>
+            <p class="mt-2 text-4xl font-extrabold tracking-tight sm:text-5xl">Order #{{ order.id }}</p>
+            <p class="mt-2 text-base text-gray-500">Your order was placed on {{ order.created_at|date:"F j, Y" }} and is currently being processed.</p>
+        </div>
+
+        <div class="mt-10 border-t border-gray-200">
+            <h2 class="sr-only">Your order</h2>
+
+            <h3 class="sr-only">Items</h3>
+            <div class="py-10 border-b border-gray-200">
+                <div class="flex space-x-6">
+                    {% for item in order.items.all %}
+                        <div class="flex-shrink-0 w-20 h-20 bg-gray-200 rounded-lg overflow-hidden sm:w-24 sm:h-24">
+                            <img src="{{ item.product.thumbnail.url }}" alt="{{ item.product.name }}" class="w-full h-full object-center object-cover">
+                        </div>
+
+                        <div class="flex-1 flex flex-col">
+                            <div>
+                                <div class="flex justify-between">
+                                    <h4 class="text-sm">
+                                        <a href="{% url 'products:detail' item.product.id %}" class="font-medium text-gray-900 hover:text-gray-800">
+                                            {{ item.product.name }}
+                                        </a>
+                                    </h4>
+                                    <p class="ml-4 text-sm font-medium text-gray-900">${{ item.price }}</p>
+                                </div>
+                                <p class="mt-1 text-sm text-gray-500">{{ item.product.category.name }}</p>
+                            </div>
+
+                            <div class="flex-1 flex items-end justify-between">
+                                <p class="mt-1 text-sm font-medium text-gray-500">Qty {{ item.quantity }}</p>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="sm:ml-40 sm:pl-6">
+                <h3 class="sr-only">Your information</h3>
+
+                <h4 class="sr-only">Addresses</h4>
+                <dl class="grid grid-cols-2 gap-x-6 py-10 text-sm">
+                    <div>
+                        <dt class="font-medium text-gray-900">Billing address</dt>
+                        <dd class="mt-2 text-gray-700">
+                            <address class="not-italic">
+                                {{ order.billing_first_name }} {{ order.billing_last_name }}<br>
+                                {{ order.billing_address }}<br>
+                                {{ order.billing_city }}, {{ order.billing_postal_code }}<br>
+                                {{ order.billing_country }}
+                            </address>
+                        </dd>
+                    </div>
+                </dl>
+
+                <h4 class="sr-only">Payment</h4>
+                <dl class="grid grid-cols-2 gap-x-6 border-t border-gray-200 py-10 text-sm">
+                    <div>
+                        <dt class="font-medium text-gray-900">Payment method</dt>
+                        <dd class="mt-2 text-gray-700">
+                            <div class="flex-auto">
+                                <p class="text-gray-900">{{ order.payment_method }}</p>
+                                <p class="text-gray-500">Paid on {{ order.paid_at|date:"F j, Y" }}</p>
+                            </div>
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-gray-900">Payment status</dt>
+                        <dd class="mt-2 text-gray-700">
+                            <div class="flex-auto">
+                                <p class="text-gray-900">{{ order.get_payment_status_display }}</p>
+                                <p class="text-gray-500">Order #{{ order.id }}</p>
+                            </div>
+                        </dd>
+                    </div>
+                </dl>
+
+                <h3 class="sr-only">Summary</h3>
+
+                <dl class="space-y-6 border-t border-gray-200 pt-10 text-sm">
+                    <div class="flex justify-between">
+                        <dt class="font-medium text-gray-900">Subtotal</dt>
+                        <dd class="text-gray-700">${{ order.subtotal }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="font-medium text-gray-900">Total</dt>
+                        <dd class="text-gray-900">${{ order.total }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        <div class="mt-10 border-t border-gray-200 pt-6">
+            <div class="flex space-x-4">
+                <a href="{% url 'products:list' %}" class="text-sm font-medium text-indigo-600 hover:text-indigo-500">
+                    Continue Shopping<span aria-hidden="true"> &rarr;</span>
+                </a>
+                <a href="{% url 'orders:list' %}" class="text-sm font-medium text-indigo-600 hover:text-indigo-500">
+                    View all orders<span aria-hidden="true"> &rarr;</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
