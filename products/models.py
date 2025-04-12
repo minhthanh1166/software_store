@@ -51,6 +51,69 @@ class Product(models.Model):
     name = models.CharField(_('name'), max_length=200)
     slug = models.SlugField(unique=True)
     description = models.TextField(_('description'))
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products')
+    developer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='developed_products')
+    
+    # Thông tin phần mềm
+    version = models.CharField(_('version'), max_length=50)
+    software_type = models.CharField(_('software type'), max_length=20, choices=SOFTWARE_TYPES)
+    license_type = models.CharField(_('license type'), max_length=20, choices=LICENSE_TYPES)
+    supported_platforms = models.CharField(_('supported platforms'), max_length=200)
+    system_requirements = models.TextField(_('system requirements'), blank=True)
+    file_size = models.CharField(_('file size'), max_length=50)
+    
+    # Giá và trạng thái
+    price = models.DecimalField(_('price'), max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
+    is_active = models.BooleanField(_('is active'), default=True)
+    
+    # Media
+    thumbnail = models.ImageField(_('thumbnail'), upload_to='products/thumbnails/')
+    demo_url = models.URLField(_('demo URL'), blank=True)
+    download_url = models.URLField(_('download URL'))
+    
+    # Fields cho việc theo dõi
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = _('product')
+        verbose_name_plural = _('products')
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return self.name
+    
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+    
+    @property
+    def average_rating(self):
+        """Tính điểm đánh giá trung bình của sản phẩm"""
+        reviews = self.reviews.filter(is_approved=True)
+        if reviews.exists():
+            total_rating = sum(review.rating for review in reviews)
+            return round(total_rating / reviews.count(), 1)
+        return 0
+    
+    @property
+    def rating_distribution(self):
+        """Tính phân bố điểm đánh giá (số lượng mỗi sao)"""
+        distribution = {i: 0 for i in range(1, 6)}
+        reviews = self.reviews.filter(is_approved=True)
+        
+        for review in reviews:
+            distribution[review.rating] += 1
+            
+        return distribution
+    
+    @property
+    def total_reviews(self):
+        """Tổng số đánh giá đã được duyệt"""
+        return self.reviews.filter(is_approved=True).count()
+    slug = models.SlugField(unique=True)
+    description = models.TextField(_('description'))
     price = models.DecimalField(_('price'), max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products')
     software_type = models.CharField(_('software type'), max_length=20, choices=SOFTWARE_TYPES)
