@@ -49,7 +49,7 @@ class ProductSearchForm(forms.Form):
     software_type = forms.ChoiceField(
         choices=Product.SOFTWARE_TYPES,
         required=False,
-        empty_label=_('All Types')
+        # empty_label=_('All Types')
     )
     min_price = forms.DecimalField(
         required=False,

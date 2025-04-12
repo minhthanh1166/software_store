@@ -5,8 +5,8 @@ from django.views.generic import ListView, DetailView, CreateView, UpdateView, D
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Q
-from .models import Category, Product, ProductScreenshot
-from .forms import CategoryForm, ProductForm, ProductScreenshotForm, ProductSearchForm
+from .models import Category, Product
+from .forms import ProductForm, ProductScreenshotForm, ProductSearchForm
 
 class ProductListView(ListView):
     model = Product

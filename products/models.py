@@ -124,7 +124,10 @@ class Product(models.Model):
     # Thông tin kỹ thuật
     system_requirements = models.TextField(_('system requirements'), blank=True)
     supported_platforms = models.CharField(_('supported platforms'), max_length=255)
-    file_size = models.CharField(_('file size'), max_length=50)
+    file_size = models.CharField(_('file size'), max_length=50)\
+    
+    demo_url = models.URLField(_('demo URL'), blank=True, null=True)
+    download_url = models.URLField(_('download URL'), blank=True, null=True)
     
     # Hình ảnh và media
     thumbnail = models.ImageField(_('thumbnail'), upload_to='products/thumbnails/')
