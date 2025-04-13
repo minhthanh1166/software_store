@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.utils.translation import gettext_lazy as _
 from django.contrib import messages
 from .models import Review, ReviewResponse
@@ -27,26 +27,24 @@ class ReviewCreateView(LoginRequiredMixin, CreateView):
     model = Review
     form_class = ReviewForm
     template_name = 'reviews/review_form.html'
-    success_url = reverse_lazy('reviews:list')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         product_id = self.kwargs.get('product_id')
-        product = get_object_or_404(Product, id=product_id)
-        context['product'] = product
+        context['product'] = get_object_or_404(Product, id=product_id)
         return context
 
     def form_valid(self, form):
         product_id = self.kwargs.get('product_id')
         product = get_object_or_404(Product, id=product_id)
         
-        # Check if user has already reviewed this product
+        # Kiểm tra xem người dùng đã đánh giá sản phẩm này chưa
         if Review.objects.filter(product=product, user=self.request.user).exists():
-            messages.error(self.request, _('You have already reviewed this product'))
-            return redirect('products:detail', pk=product.id)
+            messages.error(self.request, 'Bạn đã đánh giá sản phẩm này rồi')
+            return self.form_invalid(form)
         
-        # Check if user has purchased the product
-        has_purchased = product.orderitem_set.filter(
+        # Kiểm tra xem người dùng đã mua sản phẩm chưa
+        has_purchased = product.order_items.filter(
             order__user=self.request.user,
             order__payment_status=True
         ).exists()
@@ -57,8 +55,11 @@ class ReviewCreateView(LoginRequiredMixin, CreateView):
         review.is_verified_purchase = has_purchased
         review.save()
         
-        messages.success(self.request, _('Review submitted successfully'))
+        messages.success(self.request, 'Cảm ơn bạn đã đánh giá sản phẩm!')
         return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse('products:detail', kwargs={'pk': self.object.product.id})
 
 class ReviewUpdateView(LoginRequiredMixin, UpdateView):
     model = Review

@@ -2,11 +2,12 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Q
-from .models import Category, Product
-from .forms import ProductForm, ProductScreenshotForm, ProductSearchForm
+from django.contrib import messages
+from .models import Category, Product, Review
+from .forms import ProductForm, ProductScreenshotForm, ProductSearchForm, ReviewForm
 
 class ProductListView(ListView):
     model = Product
@@ -60,7 +61,7 @@ class ProductDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         product = self.get_object()
-        context['screenshots'] = product.product_screenshots.all()
+        context['screenshots'] = product.screenshots.all()
         context['related_products'] = Product.objects.filter(
             category=product.category,
             is_active=True
@@ -131,3 +132,41 @@ class CategoryDetailView(DetailView):
             is_active=True
         )
         return context
+
+class ReviewCreateView(LoginRequiredMixin, CreateView):
+    model = Review
+    form_class = ReviewForm
+    template_name = 'products/review_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        product_id = self.kwargs.get('product_id')
+        context['product'] = get_object_or_404(Product, id=product_id)
+        return context
+
+    def form_valid(self, form):
+        product_id = self.kwargs.get('product_id')
+        product = get_object_or_404(Product, id=product_id)
+        
+        # Kiểm tra xem người dùng đã đánh giá sản phẩm này chưa
+        if Review.objects.filter(product=product, user=self.request.user).exists():
+            messages.error(self.request, 'Bạn đã đánh giá sản phẩm này rồi')
+            return self.form_invalid(form)
+        
+        # Kiểm tra xem người dùng đã mua sản phẩm chưa
+        has_purchased = product.order_items.filter(
+            order__user=self.request.user,
+            order__payment_status=True
+        ).exists()
+        
+        review = form.save(commit=False)
+        review.product = product
+        review.user = self.request.user
+        review.is_verified_purchase = has_purchased
+        review.save()
+        
+        messages.success(self.request, 'Cảm ơn bạn đã đánh giá sản phẩm!')
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse('products:detail', kwargs={'slug': self.object.product.slug})

@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils.translation import gettext_lazy as _
 from .models import User
+from .forms import UserRegisterForm, UserProfileForm
 
 def login_view(request):
     if request.user.is_authenticated:
@@ -35,74 +36,32 @@ def logout_view(request):
     messages.success(request, _('Đăng xuất thành công'))
     return redirect('products:list')
 
-def register_view(request):
-    if request.user.is_authenticated:
-        return redirect('products:list')
-        
+def register(request):
     if request.method == 'POST':
-        username = request.POST.get('username')
-        email = request.POST.get('email')
-        phone_number = request.POST.get('phone_number')
-        password = request.POST.get('password')
-        password2 = request.POST.get('password2')
-        
-        # Kiểm tra mật khẩu
-        if password != password2:
-            messages.error(request, _('Mật khẩu xác nhận không khớp'))
-            return render(request, 'accounts/register.html')
-        
-        # Kiểm tra email đã tồn tại chưa
-        if User.objects.filter(email=email).exists():
-            messages.error(request, _('Email đã được sử dụng'))
-            return render(request, 'accounts/register.html')
-        
-        # Kiểm tra username đã tồn tại chưa
-        if User.objects.filter(username=username).exists():
-            messages.error(request, _('Tên người dùng đã được sử dụng'))
-            return render(request, 'accounts/register.html')
-        
-        # Kiểm tra số điện thoại đã tồn tại chưa
-        if User.objects.filter(phone_number=phone_number).exists():
-            messages.error(request, _('Số điện thoại đã được sử dụng'))
-            return render(request, 'accounts/register.html')
-        
-        # Tạo user mới
-        user = User.objects.create_user(
-            username=username,
-            email=email,
-            phone_number=phone_number,
-            password=password
-        )
-        
-        # Đăng nhập sau khi đăng ký
-        login(request, user)
-        messages.success(request, _('Đăng ký thành công'))
-        return redirect('products:list')
-    
-    return render(request, 'accounts/register.html')
+        form = UserRegisterForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, _('Tài khoản của bạn đã được tạo thành công! Bạn có thể đăng nhập ngay bây giờ.'))
+            return redirect('accounts:login')
+    else:
+        form = UserRegisterForm()
+    return render(request, 'accounts/register.html', {'form': form})
 
 @login_required
-def profile_view(request):
-    user = request.user
-    
-    if request.method == 'POST':
-        # Cập nhật thông tin người dùng
-        user.first_name = request.POST.get('first_name', '')
-        user.last_name = request.POST.get('last_name', '')
-        user.phone_number = request.POST.get('phone_number', '')
-        user.address = request.POST.get('address', '')
-        user.company_name = request.POST.get('company_name', '')
-        user.company_website = request.POST.get('company_website', '')
-        
-        # Cập nhật avatar nếu có
-        if 'avatar' in request.FILES:
-            user.avatar = request.FILES['avatar']
-        
-        user.save()
-        messages.success(request, _('Thông tin cá nhân đã được cập nhật'))
-        return redirect('accounts:profile')
-    
+def profile(request):
     return render(request, 'accounts/profile.html')
+
+@login_required
+def edit_profile(request):
+    if request.method == 'POST':
+        form = UserProfileForm(request.POST, request.FILES, instance=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, _('Thông tin của bạn đã được cập nhật thành công!'))
+            return redirect('accounts:profile')
+    else:
+        form = UserProfileForm(instance=request.user)
+    return render(request, 'accounts/edit_profile.html', {'form': form})
 
 @login_required
 def change_password(request):

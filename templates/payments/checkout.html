@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Thanh toán đơn hàng #{{ order.id }} - Software Store{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-100 py-6">
+    <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
+        <div class="bg-white overflow-hidden shadow-sm rounded-lg">
+            <!-- Header -->
+            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">
+                    Thanh toán đơn hàng #{{ order.id }}
+                </h3>
+                <p class="mt-1 max-w-2xl text-sm text-gray-500">
+                    Vui lòng hoàn tất thanh toán trong vòng <span id="countdown">15:00</span>
+                </p>
+            </div>
+
+            <!-- Order Details -->
+            <div class="border-b border-gray-200 px-4 py-5 sm:px-6">
+                <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+                    <div class="sm:col-span-1">
+                        <dt class="text-sm font-medium text-gray-500">Tổng tiền</dt>
+                        <dd class="mt-1 text-2xl font-semibold text-indigo-600">{{ order.total_amount|floatformat:0 }} VNĐ</dd>
+                    </div>
+                    <div class="sm:col-span-1">
+                        <dt class="text-sm font-medium text-gray-500">Trạng thái</dt>
+                        <dd class="mt-1">
+                            <span id="payment-status" class="px-2 py-1 text-yellow-800 text-xs font-medium bg-yellow-100 rounded-full">
+                                Chờ thanh toán
+                            </span>
+                        </dd>
+                    </div>
+                </dl>
+            </div>
+
+            <!-- Payment QR Code -->
+            <div class="px-4 py-5 sm:p-6">
+                <div class="text-center">
+                    <h4 class="text-lg font-medium text-gray-900">Quét mã QR để thanh toán</h4>
+                    <p class="mt-1 text-sm text-gray-500">Sử dụng ứng dụng SePay hoặc ứng dụng ngân hàng để quét mã</p>
+                    
+                    <div class="mt-4 flex justify-center">
+                        <!-- Mock QR Code using a placeholder image -->
+                        <div class="p-4 bg-white border-2 border-gray-200 rounded-lg">
+                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=sepay://pay/{{ order.id }}?amount={{ order.total_amount }}" 
+                                 alt="QR Code Thanh toán" 
+                                 class="w-48 h-48">
+                        </div>
+                    </div>
+
+                    <div class="mt-6">
+                        <p class="text-sm text-gray-500">Số tiền: <span class="font-medium text-gray-900">{{ order.total_amount|floatformat:0 }} VNĐ</span></p>
+                        <p class="text-sm text-gray-500">Mã đơn hàng: <span class="font-medium text-gray-900">#{{ order.id }}</span></p>
+                    </div>
+
+                    <!-- Payment Instructions -->
+                    <div class="mt-8 border-t border-gray-200 pt-6">
+                        <h5 class="text-sm font-medium text-gray-900">Hướng dẫn thanh toán:</h5>
+                        <ol class="mt-4 text-sm text-gray-500 text-left list-decimal list-inside space-y-2">
+                            <li>Mở ứng dụng SePay hoặc ứng dụng ngân hàng trên điện thoại</li>
+                            <li>Chọn chức năng quét mã QR</li>
+                            <li>Quét mã QR bên trên</li>
+                            <li>Kiểm tra thông tin và xác nhận thanh toán</li>
+                        </ol>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="mt-8 flex justify-center space-x-4">
+                        <a href="{% url 'orders:detail' order.id %}" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            Quay lại
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Countdown timer
+let timeLeft = 900; // 15 minutes in seconds
+const countdownElement = document.getElementById('countdown');
+const statusElement = document.getElementById('payment-status');
+
+function updateCountdown() {
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+    countdownElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    
+    if (timeLeft <= 0) {
+        clearInterval(countdownInterval);
+        window.location.href = "{% url 'orders:detail' order.id %}";
+    }
+    timeLeft--;
+}
+
+// Check payment status every 5 seconds
+function checkPaymentStatus() {
+    fetch(`/orders/payment/check/${order.id}/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'completed') {
+                statusElement.className = 'px-2 py-1 text-green-800 text-xs font-medium bg-green-100 rounded-full';
+                statusElement.textContent = 'Thanh toán thành công';
+                window.location.href = "{% url 'orders:payment_return' %}?order_id={{ order.id }}&status=success";
+            } else if (data.status === 'failed') {
+                statusElement.className = 'px-2 py-1 text-red-800 text-xs font-medium bg-red-100 rounded-full';
+                statusElement.textContent = 'Thanh toán thất bại';
+                setTimeout(() => {
+                    window.location.href = "{% url 'orders:detail' order.id %}";
+                }, 2000);
+            }
+        });
+}
+
+const countdownInterval = setInterval(updateCountdown, 1000);
+const statusCheckInterval = setInterval(checkPaymentStatus, 5000);
+
+// Clear intervals when leaving the page
+window.addEventListener('beforeunload', () => {
+    clearInterval(countdownInterval);
+    clearInterval(statusCheckInterval);
+});
+</script>
+{% endblock %} 

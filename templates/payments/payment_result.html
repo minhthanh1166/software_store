@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block title %}Kết quả thanh toán{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="card">
+        <div class="card-header">
+            <h4 class="mb-0">Kết quả thanh toán</h4>
+        </div>
+        <div class="card-body">
+            {% if payment.status == 'success' %}
+                <div class="alert alert-success">
+                    <h5><i class="fas fa-check-circle"></i> Thanh toán thành công!</h5>
+                    <p>Cảm ơn bạn đã mua hàng. Đơn hàng của bạn đã được xác nhận.</p>
+                </div>
+            {% elif payment.status == 'pending' %}
+                <div class="alert alert-warning">
+                    <h5><i class="fas fa-clock"></i> Thanh toán đang xử lý</h5>
+                    <p>Chúng tôi đang xử lý giao dịch của bạn. Vui lòng chờ trong giây lát.</p>
+                </div>
+            {% else %}
+                <div class="alert alert-danger">
+                    <h5><i class="fas fa-times-circle"></i> Thanh toán thất bại</h5>
+                    <p>Đã xảy ra lỗi trong quá trình thanh toán. Vui lòng thử lại sau.</p>
+                </div>
+            {% endif %}
+
+            <div class="mt-4">
+                <h5>Chi tiết giao dịch:</h5>
+                <ul class="list-unstyled">
+                    <li><strong>Mã đơn hàng:</strong> #{{ payment.order.id }}</li>
+                    <li><strong>Số tiền:</strong> {{ payment.amount|floatformat:0 }} VNĐ</li>
+                    <li><strong>Thời gian:</strong> {{ payment.created_at|date:"d/m/Y H:i" }}</li>
+                    <li><strong>Phương thức:</strong> SePay</li>
+                    {% if payment.transaction_id %}
+                    <li><strong>Mã giao dịch:</strong> {{ payment.transaction_id }}</li>
+                    {% endif %}
+                </ul>
+            </div>
+
+            <div class="mt-4">
+                <a href="{% url 'orders:detail' payment.order.id %}" class="btn btn-primary">Xem chi tiết đơn hàng</a>
+                <a href="{% url 'products:list' %}" class="btn btn-secondary">Tiếp tục mua sắm</a>
+            </div>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="mt-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %} 
