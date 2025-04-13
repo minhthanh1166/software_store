@@ -6,8 +6,13 @@ from django.urls import reverse_lazy, reverse
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Q
 from django.contrib import messages
+from django.http import HttpResponse, FileResponse
 from .models import Category, Product, Review
 from .forms import ProductForm, ProductScreenshotForm, ProductSearchForm, ReviewForm
+from orders.models import Order, OrderItem
+import os
+from django.conf import settings
+import mimetypes
 
 class ProductListView(ListView):
     model = Product
@@ -169,4 +174,42 @@ class ReviewCreateView(LoginRequiredMixin, CreateView):
         return super().form_valid(form)
 
     def get_success_url(self):
-        return reverse('products:detail', kwargs={'slug': self.object.product.slug})
+        return reverse('products:detail', kwargs={'pk': self.object.product.id})
+
+@login_required
+def download_product(request, product_id, order_id):
+    """
+    Xử lý tải xuống sản phẩm sau khi thanh toán thành công
+    """
+    # Kiểm tra đơn hàng tồn tại và thuộc về người dùng hiện tại
+    order = get_object_or_404(Order, id=order_id, user=request.user, status='completed')
+    
+    # Kiểm tra xem sản phẩm có trong đơn hàng không
+    order_item = get_object_or_404(OrderItem, order=order, product_id=product_id)
+    
+    # Lấy thông tin sản phẩm
+    product = order_item.product
+    
+    # Kiểm tra file tồn tại
+    if not product.file or not os.path.exists(product.file.path):
+        messages.error(request, _('File không tồn tại hoặc đã bị xóa.'))
+        return redirect('orders:detail', pk=order_id)
+    
+    # Tăng số lần tải xuống
+    order_item.download_count += 1
+    order_item.save()
+    
+    # Chuẩn bị response để tải file
+    file_path = product.file.path
+    filename = os.path.basename(file_path)
+    
+    # Xác định loại mime từ đuôi file
+    content_type, encoding = mimetypes.guess_type(file_path)
+    if content_type is None:
+        content_type = 'application/octet-stream'
+    
+    # Tạo response với file
+    response = FileResponse(open(file_path, 'rb'), content_type=content_type)
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    return response

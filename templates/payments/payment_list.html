@@ -40,7 +40,7 @@
                                         <div class="text-sm text-gray-900">{{ payment.created_at|date:"d/m/Y H:i" }}</div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm text-gray-900">${{ payment.amount }}</div>
+                                        <div class="text-sm text-gray-900">{{ payment.amount|currency }}</div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="text-sm text-gray-900">{{ payment.get_payment_method_display }}</div>

@@ -16,4 +16,7 @@ urlpatterns = [
     path('<int:pk>/delete/', views.ProductDeleteView.as_view(), name='delete'),
     path('<int:product_id>/add-screenshot/', views.add_screenshot, name='add_screenshot'),
     path('<int:product_id>/review/', views.ReviewCreateView.as_view(), name='create_review'),
+    
+    # Download URL
+    path('<int:product_id>/download/<int:order_id>/', views.download_product, name='download'),
 ] 

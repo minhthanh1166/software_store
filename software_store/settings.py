@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "reviews",   # Custom app for reviews
     "orders",    # Custom app for orders
     "payments",  # Custom app for payments
+    "cart",      # Custom app for cart
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
@@ -72,6 +73,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "orders.context_processors.cart_info",
+                "cart.context_processors.cart_processor",
             ],
         },
     },
@@ -137,12 +139,12 @@ CURRENCY_LOCALE = {
         'decimal_sep': ',',
     },
     'en': {
-        'code': 'USD',
-        'symbol': '$',
-        'position': 'before',
-        'decimal_places': 2,
-        'thousands_sep': ',',
-        'decimal_sep': '.',
+        'code': 'VND',
+        'symbol': '₫',
+        'position': 'after',
+        'decimal_places': 0,
+        'thousands_sep': '.',
+        'decimal_sep': ',',
     },
 }
 
@@ -157,10 +159,21 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Base URL for absolute URLs
+BASE_URL = 'http://127.0.0.1:8000'
+
 # SePay settings
 SEPAY_API_KEY = 'test_key'
 SEPAY_API_SECRET = 'test_secret'
+SEPAY_MERCHANT_ID = 'test_merchant'
+SEPAY_SECRET_KEY = 'test_secret_key'
+SEPAY_USER_API_KEY = os.environ.get('SEPAY_USER_API_KEY', 'test_user_api_key')
 SEPAY_BASE_URL = 'https://sepay.example.com'
+SEPAY_RETURN_URL = f"{BASE_URL}/orders/payment/check/"
+SEPAY_NOTIFY_URL = f"{BASE_URL}/orders/payment/notify/"
+SEPAY_CANCEL_URL = f"{BASE_URL}/orders/"
 
-# Base URL for absolute URLs
-BASE_URL = 'http://127.0.0.1:8000'
+# Bank account info for SePay QR code
+SEPAY_BANK_NAME = 'BIDV'
+SEPAY_ACCOUNT_NUMBER = '96247TT123'
+SEPAY_ACCOUNT_HOLDER = 'NGUYEN DUY'

@@ -30,7 +30,7 @@
                 <h5>Chi tiết giao dịch:</h5>
                 <ul class="list-unstyled">
                     <li><strong>Mã đơn hàng:</strong> #{{ payment.order.id }}</li>
-                    <li><strong>Số tiền:</strong> {{ payment.amount|floatformat:0 }} VNĐ</li>
+                    <li><strong>Số tiền:</strong> {{ payment.amount|currency }}</li>
                     <li><strong>Thời gian:</strong> {{ payment.created_at|date:"d/m/Y H:i" }}</li>
                     <li><strong>Phương thức:</strong> SePay</li>
                     {% if payment.transaction_id %}

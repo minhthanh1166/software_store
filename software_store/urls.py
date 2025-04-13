@@ -34,6 +34,7 @@ urlpatterns += i18n_patterns(
     path(_('orders/'), include('orders.urls')),
     path(_('payments/'), include('payments.urls')),
     path(_('reviews/'), include('reviews.urls')),
+    path(_('cart/'), include('cart.urls')),
     prefix_default_language=False
 )
 

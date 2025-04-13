@@ -20,7 +20,7 @@ class Payment(models.Model):
 
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='payments')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='payments')
-    amount = models.DecimalField(_('amount'), max_digits=10, decimal_places=2)
+    amount = models.DecimalField(_('amount'), max_digits=12, decimal_places=0)
     payment_method = models.CharField(_('payment method'), max_length=20, choices=PAYMENT_METHODS)
     status = models.CharField(_('status'), max_length=20, choices=STATUS_CHOICES, default='pending')
     transaction_id = models.CharField(_('transaction id'), max_length=100, unique=True)
@@ -48,7 +48,7 @@ class Refund(models.Model):
     )
 
     payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name='refunds')
-    amount = models.DecimalField(_('amount'), max_digits=10, decimal_places=2)
+    amount = models.DecimalField(_('amount'), max_digits=12, decimal_places=0)
     reason = models.TextField(_('reason'))
     status = models.CharField(_('status'), max_length=20, choices=STATUS_CHOICES, default='pending')
     admin_notes = models.TextField(_('admin notes'), blank=True)

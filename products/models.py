@@ -64,13 +64,14 @@ class Product(models.Model):
     file_size = models.CharField(_('file size'), max_length=50)
     
     # Giá và trạng thái
-    price = models.DecimalField(_('price'), max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
+    price = models.DecimalField(_('price'), max_digits=12, decimal_places=0, validators=[MinValueValidator(0)])
     is_active = models.BooleanField(_('is active'), default=True)
     is_featured = models.BooleanField(_('is featured'), default=False)
     download_count = models.PositiveIntegerField(_('download count'), default=0)
     
     # Media và URLs
     thumbnail = models.ImageField(_('thumbnail'), upload_to='products/thumbnails/')
+    file = models.FileField(_('product file'), upload_to='products/files/', blank=True, null=True)
     demo_url = models.URLField(_('demo URL'), blank=True, null=True)
     download_url = models.URLField(_('download URL'), blank=True, null=True)
     
@@ -174,7 +175,7 @@ class Order(models.Model):
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='product_orders')
     status = models.CharField(_('status'), max_length=20, choices=STATUS_CHOICES, default='pending')
-    total_amount = models.DecimalField(_('total amount'), max_digits=10, decimal_places=2)
+    total_amount = models.DecimalField(_('total amount'), max_digits=12, decimal_places=0)
     payment_method = models.CharField(_('payment method'), max_length=50)
     payment_status = models.BooleanField(_('payment status'), default=False)
     shipping_address = models.TextField(_('shipping address'))
@@ -196,7 +197,7 @@ class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='order_items')
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='order_items')
     quantity = models.PositiveIntegerField(_('quantity'), default=1)
-    price = models.DecimalField(_('price'), max_digits=10, decimal_places=2)
+    price = models.DecimalField(_('price'), max_digits=12, decimal_places=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -333,7 +334,7 @@ class Payment(models.Model):
     )
 
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='payments')
-    amount = models.DecimalField(_('amount'), max_digits=10, decimal_places=2)
+    amount = models.DecimalField(_('amount'), max_digits=12, decimal_places=0)
     payment_method = models.CharField(_('payment method'), max_length=20, choices=PAYMENT_METHODS)
     status = models.CharField(_('status'), max_length=20, choices=PAYMENT_STATUS, default='pending')
     transaction_id = models.CharField(_('transaction ID'), max_length=100, unique=True)
@@ -361,7 +362,7 @@ class Refund(models.Model):
 
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='refunds')
     payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name='refunds')
-    amount = models.DecimalField(_('amount'), max_digits=10, decimal_places=2)
+    amount = models.DecimalField(_('amount'), max_digits=12, decimal_places=0)
     reason = models.TextField(_('reason'))
     status = models.CharField(_('status'), max_length=20, choices=REFUND_STATUS, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)

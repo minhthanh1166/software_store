@@ -22,7 +22,7 @@
                 <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
                     <div class="sm:col-span-1">
                         <dt class="text-sm font-medium text-gray-500">Tổng tiền</dt>
-                        <dd class="mt-1 text-2xl font-semibold text-indigo-600">{{ order.total_amount|floatformat:0 }} VNĐ</dd>
+                        <dd class="mt-1 text-2xl font-semibold text-indigo-600">{{ order.total_amount|currency }}</dd>
                     </div>
                     <div class="sm:col-span-1">
                         <dt class="text-sm font-medium text-gray-500">Trạng thái</dt>
@@ -51,7 +51,7 @@
                     </div>
 
                     <div class="mt-6">
-                        <p class="text-sm text-gray-500">Số tiền: <span class="font-medium text-gray-900">{{ order.total_amount|floatformat:0 }} VNĐ</span></p>
+                        <p class="text-sm text-gray-500">Số tiền: <span class="font-medium text-gray-900">{{ order.total_amount|currency }}</span></p>
                         <p class="text-sm text-gray-500">Mã đơn hàng: <span class="font-medium text-gray-900">#{{ order.id }}</span></p>
                     </div>
 

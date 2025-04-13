@@ -15,7 +15,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse, JsonResponse
 from .models import Order, OrderItem
 from products.models import Product
-from .payments import SePay
+from cart.models import Cart, CartItem
+from payments.sepay import SePay
 import uuid
 import json
 import secrets
@@ -53,32 +54,30 @@ def rate_limit(key_prefix, limit=60, period=60):
 @never_cache
 def cart(request):
     """
-    Hiển thị giỏ hàng
+    Hiển thị trang thanh toán với thông tin từ giỏ hàng
     """
-    cart = request.session.get('cart', {})
-    cart_items = []
-    total_amount = Decimal('0')
+    # Lấy giỏ hàng từ database thay vì session
+    cart, created = Cart.objects.prefetch_related('items__product').get_or_create(user=request.user)
+    cart_items = cart.items.all()
     
-    if cart:
-        products = Product.objects.filter(id__in=cart.keys(), is_active=True)
-        for product in products:
-            quantity = cart.get(str(product.id), 0)
-            total = product.price * Decimal(str(quantity))
-            cart_items.append({
-                'product': product,
-                'quantity': quantity,
-                'total': total
-            })
-            total_amount += total
+    if not cart_items:
+        messages.error(request, _('Giỏ hàng của bạn đang trống'))
+        return redirect('products:list')
     
-    return render(request, 'orders/cart.html', {
+    context = {
+        'cart': cart,
         'cart_items': cart_items,
-        'total_amount': total_amount
-    })
+        'payment_methods': [
+            {'value': 'sepay', 'name': 'SePay (Thẻ tín dụng, Ví điện tử)'},
+            {'value': 'bank', 'name': 'Chuyển khoản ngân hàng'},
+        ]
+    }
+    
+    return render(request, 'orders/cart.html', context)
 
 class OrderListView(LoginRequiredMixin, ListView):
     """
-    Hiển thị danh sách đơn hàng đã hoàn thành của người dùng
+    Hiển thị danh sách đơn hàng của người dùng
     """
     model = Order
     template_name = 'orders/order_list.html'
@@ -86,13 +85,12 @@ class OrderListView(LoginRequiredMixin, ListView):
     paginate_by = 10
 
     def get_queryset(self):
-        cache_key = f'user_completed_orders_{self.request.user.id}'
+        cache_key = f'user_orders_{self.request.user.id}'
         queryset = cache.get(cache_key)
         
         if queryset is None:
             queryset = Order.objects.filter(
-                user=self.request.user,
-                status='completed'
+                user=self.request.user
             ).select_related('user').prefetch_related('items', 'items__product').order_by('-created_at')
             cache.set(cache_key, queryset, 300)  # Cache 5 phút
             
@@ -122,31 +120,44 @@ class OrderDetailView(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         order = self.get_object()
-        
-        context['payment_status'] = {
+
+        # Payment status mapping with improved styling
+        payment_statuses = {
             'pending': {
                 'class': 'bg-yellow-100 text-yellow-800',
-                'text': 'Chờ thanh toán',
+                'text': _('Chờ thanh toán'),
                 'show_payment_button': True
+            },
+            'processing': {
+                'class': 'bg-blue-100 text-blue-800',
+                'text': _('Đang xử lý'),
+                'show_payment_button': False
             },
             'completed': {
                 'class': 'bg-green-100 text-green-800',
-                'text': 'Đã thanh toán',
+                'text': _('Đã thanh toán'),
                 'show_payment_button': False
             },
             'cancelled': {
                 'class': 'bg-red-100 text-red-800',
-                'text': 'Đã hủy',
+                'text': _('Đã hủy'),
                 'show_payment_button': False
+            },
+            'failed': {
+                'class': 'bg-red-100 text-red-800',
+                'text': _('Thất bại'),
+                'show_payment_button': True
             }
-        }.get(order.status, {
+        }
+        
+        context['payment_status'] = payment_statuses.get(order.status, {
             'class': 'bg-gray-100 text-gray-800',
-            'text': 'Không xác định',
+            'text': _('Không xác định'),
             'show_payment_button': False
         })
         
-        # Nếu đơn hàng đang chờ thanh toán, tạo URL thanh toán SePay
-        if order.status == 'pending':
+        # Nếu đơn hàng đang chờ thanh toán và phương thức là SePay, tạo URL thanh toán
+        if order.status == 'pending' and order.payment_method == 'sepay':
             # Kiểm tra cache trước
             cache_key = f'payment_data_{order.id}'
             payment_data = cache.get(cache_key)
@@ -177,7 +188,15 @@ class OrderDetailView(LoginRequiredMixin, DetailView):
                 context['payment_url'] = self.request.build_absolute_uri(
                     reverse('orders:payment_checkout', kwargs={'order_id': order.id})
                 )
-                logger.info(f"Using fallback payment URL for order {order.id}: {context['payment_url']}")
+        
+        # Thêm thông tin tài khoản ngân hàng nếu thanh toán qua chuyển khoản
+        if order.payment_method == 'bank':
+            context['bank_info'] = {
+                'bank_name': '',
+                'account_number': '',
+                'account_holder': '',
+                'transfer_content': f'THANHTOAN {order.id}'
+            }
         
         return context
 
@@ -256,34 +275,30 @@ def update_cart(request, product_id):
 @rate_limit('create_order')
 def create_order(request):
     """
-    Tạo đơn hàng mới từ giỏ hàng và chuyển hướng đến trang thanh toán SePay
+    Tạo đơn hàng mới từ giỏ hàng model và chuyển hướng đến trang thanh toán
     """
     logger = logging.getLogger(__name__)
     
-    # Kiểm tra giỏ hàng
-    cart = request.session.get('cart', {})
-    if not cart:
+    # Lấy giỏ hàng từ database thay vì session
+    cart, created = Cart.objects.prefetch_related('items__product').get_or_create(user=request.user)
+    cart_items = cart.items.all()
+    
+    if not cart_items:
         messages.error(request, _('Giỏ hàng của bạn đang trống'))
         return redirect('products:list')
 
     try:
-        # Kiểm tra và lấy thông tin sản phẩm
-        product_ids = [int(id) for id in cart.keys()]
-        products = Product.objects.filter(id__in=product_ids, is_active=True)
+        # Danh sách sản phẩm
+        products = [item.product for item in cart_items]
         
-        # Đảm bảo tất cả sản phẩm đều có sẵn
-        if len(products) != len(cart):
-            messages.error(request, _('Một số sản phẩm không còn khả dụng'))
-            return redirect('orders:cart')
-
-        # Tính tổng tiền
-        total_amount = sum(
-            product.price * Decimal(str(cart[str(product.id)]))
-            for product in products
-        )
+        # Tổng tiền
+        total_amount = cart.total
 
         if request.method == 'POST':
             try:
+                # Lấy phương thức thanh toán từ form
+                payment_method = request.POST.get('payment_method', 'sepay')
+                
                 # Tạo đơn hàng mới
                 temp_transaction_id = f"TEMP-{uuid.uuid4().hex}"
                 
@@ -293,7 +308,7 @@ def create_order(request):
                     status='pending',
                     payment_status='pending',
                     total_amount=total_amount,
-                    payment_method='sepay',
+                    payment_method=payment_method,
                     transaction_id=temp_transaction_id,
                     shipping_address=getattr(request.user, 'address', '') or '',
                     shipping_phone=getattr(request.user, 'phone_number', '') or '',
@@ -302,43 +317,29 @@ def create_order(request):
                 order.save()
                 logger.info(f"Đã tạo đơn hàng với ID: {order.id}")
                 
-                # Tạo chi tiết đơn hàng
-                for product in products:
-                    quantity = int(cart[str(product.id)])
+                # Tạo chi tiết đơn hàng - mỗi sản phẩm có số lượng 1
+                for item in cart_items:
                     OrderItem.objects.create(
                         order=order,
-                        product=product,
-                        quantity=quantity,
-                        price=product.price
+                        product=item.product,
+                        quantity=1,  # Quantity is always 1
+                        price=item.product.price
                     )
                 
-                logger.info(f"Đã tạo {len(products)} mục đơn hàng")
+                logger.info(f"Đã tạo {cart_items.count()} mục đơn hàng")
                 
                 # Xóa giỏ hàng sau khi tạo đơn hàng thành công
-                del request.session['cart']
-                request.session.modified = True
+                cart.items.all().delete()
                 
-                # Khởi tạo cổng thanh toán SePay
-                sepay = SePay()
-                
-                # Tạo thông tin thanh toán
-                payment_data = sepay.create_payment({
-                    'order_id': order.id,
-                    'amount': float(order.total_amount),
-                    'return_url': request.build_absolute_uri(reverse('orders:detail', kwargs={'pk': order.id})),
-                    'notify_url': request.build_absolute_uri(reverse('orders:payment_notify'))
-                })
-                
-                # Lưu thông tin thanh toán vào cache
-                cache_key = f'payment_data_{order.id}'
-                cache.set(cache_key, payment_data, 840)  # Lưu trong 14 phút
-                
-                # Chuyển hướng trực tiếp đến trang thanh toán SePay
-                if 'payment_url' in payment_data:
-                    return redirect(payment_data['payment_url'])
-                else:
-                    # Nếu không có URL thanh toán, chuyển về trang checkout
+                # Xử lý thanh toán theo phương thức đã chọn
+                if payment_method == 'sepay':
+                    # Chuyển hướng trực tiếp đến trang checkout thay vì trang thanh toán SePay
+                    logger.info(f"Chuyển hướng đến trang checkout cho đơn hàng {order.id}")
                     return redirect('orders:payment_checkout', order_id=order.id)
+                else:
+                    # Chuyển khoản ngân hàng - hiển thị thông tin thanh toán
+                    messages.success(request, _('Đơn hàng đã được tạo. Vui lòng hoàn tất thanh toán chuyển khoản.'))
+                    return redirect('orders:detail', pk=order.id)
                 
             except Exception as e:
                 logger.error(f"Lỗi khi tạo đơn hàng: {str(e)}")
@@ -347,20 +348,8 @@ def create_order(request):
                 messages.error(request, _('Không thể tạo đơn hàng. Vui lòng thử lại sau.'))
                 return redirect('orders:cart')
 
-        # Hiển thị giỏ hàng nếu không phải POST request
-        context = {
-            'cart_items': [
-                {
-                    'product': product,
-                    'quantity': cart[str(product.id)],
-                    'total': product.price * Decimal(str(cart[str(product.id)]))
-                }
-                for product in products
-            ],
-            'total_amount': total_amount
-        }
-        
-        return render(request, 'orders/cart.html', context)
+        # Hiển thị trang checkout nếu không phải POST request
+        return redirect('orders:cart')
     
     except Exception as e:
         logger.error(f"Lỗi trong create_order: {str(e)}")
@@ -377,38 +366,54 @@ def payment_checkout(request, order_id):
         
         # Nếu đơn hàng đã hoàn thành, chuyển hướng đến trang chi tiết đơn hàng
         if order.status == 'completed':
-            messages.info(request, 'Đơn hàng này đã được thanh toán.')
-            return redirect('orders:order_detail', pk=order.id)
+            messages.info(request, _('Đơn hàng này đã được thanh toán.'))
+            return redirect('orders:detail', pk=order.id)
             
         # Khởi tạo cổng thanh toán SePay
         sepay = SePay()
         
-        # Tạo cache key cho thanh toán
-        cache_key = f'payment_data_{order.id}'
-        payment_data = cache.get(cache_key)
+        # Tạo UUID cho giao dịch này để tránh trùng lặp
+        transaction_uid = uuid.uuid4().hex[:10].upper()
         
-        # Nếu không có dữ liệu thanh toán trong cache hoặc request có tham số refresh
-        if payment_data is None or request.GET.get('refresh'):
-            payment_data = sepay.create_payment({
-                'order_id': order.id,
-                'amount': float(order.total_amount),
-                'return_url': request.build_absolute_uri(reverse('orders:order_detail', kwargs={'pk': order.id})),
-                'notify_url': request.build_absolute_uri(reverse('orders:payment_notify'))
-            })
-            # Lưu vào cache trong 14 phút (900 - 60 giây)
-            cache.set(cache_key, payment_data, 840)
+        # Tạo nội dung chuyển khoản duy nhất với UUID
+        transfer_content = f"DH{order.id}-{transaction_uid}"
+        
+        # Lưu transaction_uid vào order để sau này có thể xác minh
+        order.transaction_reference = transaction_uid
+        order.save()
+        
+        # Tạo thông tin thanh toán mới
+        payment_data = sepay.create_payment({
+            'order_id': order.id,
+            'amount': float(order.total_amount),
+            'return_url': request.build_absolute_uri(reverse('orders:detail', kwargs={'pk': order.id})),
+            'notify_url': request.build_absolute_uri(reverse('orders:payment_notify')),
+            'transfer_content': transfer_content
+        })
+        
+        # Lưu vào cache trong 15 phút
+        cache_key = f'payment_data_{order.id}'
+        cache.set(cache_key, payment_data, 900)
+        
+        logger.info(f"Tạo thông tin thanh toán cho đơn hàng {order.id} với mã giao dịch: {transaction_uid}")
         
         context = {
             'order': order,
             'payment_data': payment_data,
+            'bank_info': {
+                'bank_name': payment_data.get('bank_name', 'BIDV'),
+                'account_number': payment_data.get('account_number', '96247TT123'),
+                'account_holder': payment_data.get('account_holder', 'NGUYEN DUY'),
+                'transfer_content': payment_data.get('transfer_content', transfer_content)
+            }
         }
         return render(request, 'orders/checkout.html', context)
     except Order.DoesNotExist:
-        messages.error(request, 'Không tìm thấy đơn hàng.')
+        messages.error(request, _('Không tìm thấy đơn hàng.'))
         return redirect('orders:list')
     except Exception as e:
-        logger.error(f"Payment checkout error for order {order_id}: {str(e)}")
-        messages.error(request, 'Có lỗi xảy ra khi xử lý thanh toán. Vui lòng thử lại sau.')
+        logger.error(f"Lỗi xử lý thanh toán cho đơn hàng {order_id}: {str(e)}")
+        messages.error(request, _('Có lỗi xảy ra khi xử lý thanh toán. Vui lòng thử lại sau.'))
         return redirect('orders:list')
 
 @csrf_exempt
@@ -419,60 +424,100 @@ def payment_notify(request):
     Endpoint này sẽ được gọi bởi cổng thanh toán khi có kết quả thanh toán
     """
     try:
-        # Lấy dữ liệu từ POST request
+        # Lấy dữ liệu từ webhook SePay
         payment_data = json.loads(request.body)
+        logger.info(f"Nhận webhook từ SePay: {payment_data}")
         
-        # Khởi tạo cổng thanh toán SePay
-        sepay = SePay()
+        # Lưu thông tin giao dịch vào database (có thể tạo model Transaction)
+        # Trong ví dụ PHP, họ lưu vào bảng tb_transactions
+        transaction_fields = {
+            'gateway': payment_data.get('gateway', ''),
+            'transaction_date': payment_data.get('transactionDate', ''),
+            'account_number': payment_data.get('accountNumber', ''),
+            'transfer_type': payment_data.get('transferType', ''),
+            'transfer_amount': payment_data.get('transferAmount', 0),
+            'transaction_content': payment_data.get('content', ''),
+            'reference_code': payment_data.get('referenceCode', ''),
+            'description': payment_data.get('description', '')
+        }
         
-        # Xác minh tính hợp lệ của thông báo thanh toán
-        verification = sepay.verify_payment(payment_data)
+        # Log dữ liệu giao dịch để debug
+        logger.info(f"Dữ liệu giao dịch: {transaction_fields}")
         
-        if verification.get('success'):
-            # Lấy thông tin đơn hàng
-            order_id = verification.get('order_id')
-            transaction_id = verification.get('transaction_id')
+        # Trích xuất order_id từ nội dung chuyển khoản bằng regex
+        # Mẫu mới: DH123-ABC123 -> 123 là order_id và ABC123 là transaction_uid
+        import re
+        content = payment_data.get('content', '')
+        regex = r'DH(\d+)(?:-([A-Z0-9]+))?'
+        matches = re.search(regex, content)
+        
+        if matches:
+            # Nếu tìm thấy mã đơn hàng trong nội dung chuyển khoản
+            order_id = matches.group(1)
+            transaction_uid = matches.group(2) if len(matches.groups()) > 1 and matches.group(2) else None
             
-            # Cập nhật trạng thái đơn hàng
+            logger.info(f"Tìm thấy mã đơn hàng: {order_id}, mã giao dịch: {transaction_uid}")
+            
+            # Kiểm tra số tiền và trạng thái đơn hàng
+            transfer_amount = payment_data.get('transferAmount', 0)
+            
             try:
                 with transaction.atomic():
-                    order = Order.objects.select_for_update().get(id=order_id)
+                    # Tìm đơn hàng khớp với ID và trạng thái pending
+                    order = Order.objects.select_for_update().get(
+                        id=order_id,
+                        status='pending'
+                    )
                     
-                    # Chỉ cập nhật nếu đơn hàng chưa hoàn thành
-                    if order.status != 'completed':
+                    # Kiểm tra transaction_uid nếu có
+                    if transaction_uid and hasattr(order, 'transaction_reference') and order.transaction_reference:
+                        if order.transaction_reference != transaction_uid:
+                            logger.warning(f"Mã giao dịch không khớp: Đơn hàng #{order_id}, Expected: {order.transaction_reference}, Actual: {transaction_uid}")
+                            # Vẫn tiếp tục xác nhận nếu ID đơn hàng và số tiền khớp
+                    
+                    # Kiểm tra số tiền khớp với đơn hàng
+                    expected_amount = float(order.total_amount)
+                    actual_amount = float(transfer_amount)
+                    
+                    # Cho phép sai lệch 1% do làm tròn số
+                    if abs(expected_amount - actual_amount) <= (expected_amount * 0.01):
+                        # Cập nhật trạng thái đơn hàng thành completed
                         order.status = 'completed'
-                        order.transaction_id = transaction_id
+                        order.payment_status = 'completed'
+                        order.transaction_id = payment_data.get('id') or payment_data.get('referenceCode')
                         order.save()
                         
-                        # Tạo license key và download URL cho từng mục đơn hàng
-                        for item in order.orderitem_set.all():
-                            # Kiểm tra xem item đã có license_key chưa
+                        # Cập nhật chi tiết đơn hàng
+                        for item in order.items.all():
                             if not item.license_key:
                                 item.license_key = f"SW-{order.id}-{item.product.id}-{secrets.token_hex(8).upper()}"
                                 item.download_url = reverse('products:download', kwargs={'product_id': item.product.id, 'order_id': order.id})
                                 item.save()
                         
-                        # Xóa cache thanh toán
+                        # Xóa cache nếu có
                         cache.delete(f'payment_data_{order.id}')
+                        cache.delete(f'order_{order.id}')
                         
-                        # Gửi email thông báo
+                        # Gửi email thông báo (nếu cần)
                         # send_order_confirmation.delay(order.id)
-                
-                return JsonResponse({'status': 'success'})
+                        
+                        logger.info(f"Cập nhật thành công đơn hàng: {order_id}")
+                        return JsonResponse({'success': True})
+                    else:
+                        logger.warning(f"Số tiền không khớp: Đơn hàng #{order_id}, Expected: {expected_amount}, Actual: {actual_amount}")
+                        return JsonResponse({'success': False, 'message': 'Số tiền không khớp'})
             except Order.DoesNotExist:
-                return JsonResponse({'status': 'error', 'message': 'Order not found'}, status=404)
-            except Exception as e:
-                logger.error(f"Error updating order {order_id}: {str(e)}")
-                return JsonResponse({'status': 'error', 'message': 'Internal server error'}, status=500)
+                logger.warning(f"Không tìm thấy đơn hàng: {order_id}")
+                return JsonResponse({'success': False, 'message': f'Không tìm thấy đơn hàng: {order_id}'}, status=404)
         else:
-            # Ghi log lỗi nếu xác minh thất bại
-            logger.warning(f"Invalid payment notification: {payment_data}")
-            return JsonResponse({'status': 'error', 'message': 'Invalid payment data'}, status=400)
+            logger.warning(f"Không tìm thấy mã đơn hàng trong nội dung: {content}")
+            return JsonResponse({'success': False, 'message': 'Không tìm thấy mã đơn hàng'}, status=400)
     except json.JSONDecodeError:
-        return JsonResponse({'status': 'error', 'message': 'Invalid JSON'}, status=400)
+        logger.error("Dữ liệu webhook không hợp lệ (JSON)")
+        return JsonResponse({'success': False, 'message': 'Dữ liệu webhook không hợp lệ'}, status=400)
     except Exception as e:
-        logger.error(f"Payment notification error: {str(e)}")
-        return JsonResponse({'status': 'error', 'message': 'Internal server error'}, status=500)
+        logger.error(f"Lỗi xử lý webhook: {str(e)}", exc_info=True)
+        return JsonResponse({'success': False, 'message': f'Lỗi hệ thống: {str(e)}'}, status=500)
 
 @login_required
 def check_payment_status(request, order_id):
@@ -484,49 +529,92 @@ def check_payment_status(request, order_id):
         order = Order.objects.get(id=order_id, user=request.user)
         
         # Nếu đơn hàng đã hoàn thành, trả về trạng thái completed
-        if order.status == 'completed':
+        if order.status == 'completed' or order.payment_status == 'completed':
             return JsonResponse({
                 'status': 'completed',
-                'redirect_url': reverse('orders:order_detail', kwargs={'pk': order.id})
+                'message': _('Thanh toán đã hoàn thành'),
+                'redirect_url': reverse('orders:detail', kwargs={'pk': order.id})
             })
         
         # Nếu đơn hàng bị hủy, trả về trạng thái cancelled
         if order.status == 'cancelled':
             return JsonResponse({
                 'status': 'cancelled',
-                'message': 'Đơn hàng đã bị hủy.'
+                'message': _('Đơn hàng đã bị hủy')
             })
-        
-        # Kiểm tra trạng thái từ cổng thanh toán nếu có transaction_id
-        if order.transaction_id:
-            sepay = SePay()
-            result = sepay.query_transaction(order.transaction_id)
             
-            if result.get('success') and result.get('status') == 'paid':
-                # Cập nhật trạng thái đơn hàng nếu thanh toán thành công
-                with transaction.atomic():
-                    order.status = 'completed'
-                    order.save()
-                    
-                    # Tạo license key và download URL cho từng mục đơn hàng
-                    for item in order.orderitem_set.all():
-                        if not item.license_key:
-                            item.license_key = f"SW-{order.id}-{item.product.id}-{secrets.token_hex(8).upper()}"
-                            item.download_url = reverse('products:download', kwargs={'product_id': item.product.id, 'order_id': order.id})
-                            item.save()
-                
-                # Gửi email thông báo
-                # send_order_confirmation.delay(order.id)
-                
-                return JsonResponse({
-                    'status': 'completed',
-                    'redirect_url': reverse('orders:order_detail', kwargs={'pk': order.id})
-                })
+        # Kiểm tra giao dịch từ SePay
+        sepay = SePay()
         
-        # Trả về pending nếu chưa hoàn thành hoặc hủy
-        return JsonResponse({'status': 'pending'})
+        # Lọc giao dịch theo nội dung chuyển khoản tìm đơn hàng hiện tại
+        reference = f"DH{order.id}"
+        transactions = sepay.get_transactions_list({
+            'transaction_date_min': order.created_at.strftime('%Y-%m-%d'),
+            'limit': 20
+        })
+        
+        if transactions['success'] and transactions.get('transactions'):
+            # Lọc các giao dịch có nội dung chứa mã đơn hàng
+            order_transactions = []
+            for txn in transactions.get('transactions', []):
+                content = txn.get('transaction_content', '')
+                if reference in content:
+                    order_transactions.append(txn)
+            
+            if order_transactions:
+                # Tìm thấy giao dịch cho đơn hàng này
+                latest_transaction = order_transactions[0]  # Giao dịch mới nhất
+                
+                # Lấy chi tiết giao dịch
+                transaction_id = latest_transaction.get('id')
+                transaction_details = sepay.verify_transaction(transaction_id)
+                
+                if transaction_details['success']:
+                    # Kiểm tra số tiền
+                    expected_amount = float(order.total_amount)
+                    actual_amount = float(transaction_details.get('amount', 0))
+                    
+                    # Cho phép sai lệch 1% do làm tròn số
+                    if abs(expected_amount - actual_amount) <= (expected_amount * 0.01):
+                        # Cập nhật trạng thái đơn hàng
+                        from django.db import transaction as db_transaction
+                        with db_transaction.atomic():
+                            order.status = 'completed'
+                            order.payment_status = 'completed'
+                            order.transaction_id = transaction_details.get('transaction_id')
+                            order.save()
+                            
+                            # Cập nhật chi tiết đơn hàng
+                            for item in order.items.all():
+                                if not item.license_key:
+                                    item.license_key = f"SW-{order.id}-{item.product.id}-{secrets.token_hex(8).upper()}"
+                                    item.download_url = reverse('products:download', kwargs={'product_id': item.product.id, 'order_id': order.id})
+                                    item.save()
+                            
+                            # Xóa cache
+                            cache.delete(f'payment_data_{order.id}')
+                            cache.delete(f'order_{order.id}')
+                        
+                        # Trả về trạng thái completed
+                        return JsonResponse({
+                            'status': 'completed',
+                            'message': _('Thanh toán đã hoàn thành'),
+                            'redirect_url': reverse('orders:detail', kwargs={'pk': order.id})
+                        })
+        
+        # Đơn hàng vẫn đang xử lý, trả về trạng thái pending
+        return JsonResponse({
+            'status': 'pending',
+            'message': _('Đơn hàng đang chờ thanh toán')
+        })
     except Order.DoesNotExist:
-        return JsonResponse({'status': 'error', 'message': 'Không tìm thấy đơn hàng'}, status=404)
+        return JsonResponse({
+            'status': 'error', 
+            'message': _('Không tìm thấy đơn hàng')
+        }, status=404)
     except Exception as e:
-        logger.error(f"Check payment status error for order {order_id}: {str(e)}")
-        return JsonResponse({'status': 'error', 'message': 'Lỗi hệ thống'}, status=500)
+        logger.error(f"Lỗi kiểm tra trạng thái thanh toán cho đơn hàng {order_id}: {str(e)}")
+        return JsonResponse({
+            'status': 'error', 
+            'message': _('Lỗi hệ thống')
+        }, status=500)

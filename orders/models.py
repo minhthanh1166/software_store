@@ -11,14 +11,21 @@ import uuid
 class Order(models.Model):
     STATUS_CHOICES = (
         ('pending', _('Chờ thanh toán')),
-        ('completed', _('Đã thanh toán')),
+        ('processing', _('Đang xử lý')),
+        ('completed', _('Hoàn thành')),
         ('cancelled', _('Đã hủy')),
     )
 
     PAYMENT_STATUS_CHOICES = (
         ('pending', _('Chờ thanh toán')),
-        ('completed', _('Đã thanh toán')),
-        ('failed', _('Thanh toán thất bại')),
+        ('processing', _('Đang xử lý')),
+        ('completed', _('Hoàn thành')),
+        ('failed', _('Thất bại')),
+    )
+
+    PAYMENT_METHOD_CHOICES = (
+        ('sepay', 'SePay'),
+        ('bank', _('Chuyển khoản ngân hàng')),
     )
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders', db_index=True)
@@ -26,8 +33,9 @@ class Order(models.Model):
     payment_status = models.CharField(_('Trạng thái thanh toán'), max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
     total_amount = models.DecimalField(_('Tổng tiền'), max_digits=10, decimal_places=2, 
                                      validators=[MinValueValidator(Decimal('0.01'))])
-    payment_method = models.CharField(_('Phương thức thanh toán'), max_length=50, default='sepay')
+    payment_method = models.CharField(_('Phương thức thanh toán'), max_length=20, choices=PAYMENT_METHOD_CHOICES, default='sepay')
     transaction_id = models.CharField(_('Mã giao dịch'), max_length=100, blank=True, null=True)
+    transaction_reference = models.CharField(max_length=100, blank=True, null=True, help_text=_('Mã tham chiếu UUID cho giao dịch'))
     
     # Trong cơ sở dữ liệu cũ, vẫn có các trường shipping
     shipping_address = models.CharField(_('Địa chỉ giao hàng'), max_length=255, blank=True, null=True)
@@ -83,6 +91,26 @@ class Order(models.Model):
     def can_cancel(self):
         """Kiểm tra có thể hủy đơn hàng không"""
         return self.status == 'pending'
+
+    @property
+    def payment_status_display_class(self):
+        status_classes = {
+            'pending': 'bg-yellow-100 text-yellow-800',
+            'processing': 'bg-blue-100 text-blue-800',
+            'completed': 'bg-green-100 text-green-800',
+            'failed': 'bg-red-100 text-red-800',
+        }
+        return status_classes.get(self.payment_status, 'bg-gray-100 text-gray-800')
+
+    @property
+    def status_display_class(self):
+        status_classes = {
+            'pending': 'bg-yellow-100 text-yellow-800',
+            'processing': 'bg-blue-100 text-blue-800',
+            'completed': 'bg-green-100 text-green-800',
+            'cancelled': 'bg-red-100 text-red-800',
+        }
+        return status_classes.get(self.status, 'bg-gray-100 text-gray-800')
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
