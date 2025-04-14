@@ -272,7 +272,7 @@
                             <div class="rating-bar">
                                 <span class="rating-label">{{ i }} sao</span>
                                 <div class="bar-container">
-                                    <div class="bar" style="width: {% widthratio product.rating_distribution|get_item:i 100 product.total_reviews %}%"></div>
+                                    <div class="bar" style="width: {% widthratio product.rating_distribution|get_item:i product.total_reviews 100 %}%"></div>
                                 </div>
                                 <span class="rating-count">{{ product.rating_distribution|get_item:i }}</span>
                             </div>
@@ -515,7 +515,7 @@
                 this.classList.add('opacity-75');
                 
                 try {
-                    const response = await fetch(`{% url 'reviews:mark_helpful' '0' %}`.replace('0', reviewId), {
+                    const response = await fetch(`/reviews/${reviewId}/helpful/`, {
                         method: 'POST',
                         headers: {
                             'X-CSRFToken': csrfToken,
@@ -572,7 +572,7 @@
                 this.classList.add('opacity-75');
                 
                 try {
-                    const response = await fetch(`{% url 'products:toggle_favorite' product.id %}`.replace('{{ product.id }}', productId), {
+                    const response = await fetch(`/products/toggle-favorite/${productId}/`, {
                         method: 'POST',
                         headers: {
                             'X-CSRFToken': csrfToken,

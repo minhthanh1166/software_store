@@ -219,6 +219,7 @@ class SePay:
     def get_transactions_list(self, params=None):
         """
         Lấy danh sách giao dịch từ SePay API
+        Chỉ lấy 3 giao dịch gần nhất để tối ưu tốc độ kiểm tra
         
         Tham số:
             params (dict): Các tham số truy vấn (account_number, transaction_date_min, transaction_date_max, etc.)
@@ -238,9 +239,16 @@ class SePay:
             
             # Chuẩn bị URL với các tham số
             url = "https://my.sepay.vn/userapi/transactions/list"
-            if params:
-                query_string = urlencode(params)
-                url = f"{url}?{query_string}"
+            if params is None:
+                params = {}
+                
+            # Giới hạn chỉ lấy 3 giao dịch gần nhất
+            params['limit'] = 3
+            params['sort_by'] = 'created_at'
+            params['sort_direction'] = 'desc'
+            
+            query_string = urlencode(params)
+            url = f"{url}?{query_string}"
             
             # Gọi API
             response = requests.get(url, headers=headers)
