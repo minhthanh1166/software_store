@@ -1,3 +1,4 @@
 /venv
 /__pycache__
+.env
 # vào bên trong thư mục __pycache__
