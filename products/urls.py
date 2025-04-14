@@ -19,4 +19,5 @@ urlpatterns = [
     
     # Download URL
     path('<int:product_id>/download/<int:order_id>/', views.download_product, name='download'),
+    path('toggle-favorite/<int:product_id>/', views.toggle_favorite, name='toggle_favorite'),
 ] 

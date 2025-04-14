@@ -6,8 +6,9 @@ from django.urls import reverse_lazy, reverse
 from django.utils.translation import gettext_lazy as _
 from django.contrib import messages
 from .models import Review, ReviewResponse
-from products.models import Product
+from products.models import Product, OrderItem
 from .forms import ReviewForm, ReviewResponseForm
+from django.http import JsonResponse
 
 class ReviewListView(ListView):
     model = Review
@@ -27,39 +28,45 @@ class ReviewCreateView(LoginRequiredMixin, CreateView):
     model = Review
     form_class = ReviewForm
     template_name = 'reviews/review_form.html'
-
+    
+    def get_success_url(self):
+        return reverse('products:detail', kwargs={'pk': self.kwargs.get('product_id')})
+    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         product_id = self.kwargs.get('product_id')
-        context['product'] = get_object_or_404(Product, id=product_id)
+        product = get_object_or_404(Product, id=product_id)
+        context['product'] = product
         return context
-
+    
     def form_valid(self, form):
         product_id = self.kwargs.get('product_id')
         product = get_object_or_404(Product, id=product_id)
         
-        # Kiểm tra xem người dùng đã đánh giá sản phẩm này chưa
+        # Check if user has already reviewed this product
         if Review.objects.filter(product=product, user=self.request.user).exists():
-            messages.error(self.request, 'Bạn đã đánh giá sản phẩm này rồi')
-            return self.form_invalid(form)
+            messages.error(self.request, _('You have already reviewed this product'))
+            return redirect('products:detail', pk=product_id)
         
-        # Kiểm tra xem người dùng đã mua sản phẩm chưa
-        has_purchased = product.order_items.filter(
+        # Check if user has purchased the product
+        has_purchased = OrderItem.objects.filter(
             order__user=self.request.user,
-            order__payment_status=True
+            product=product,
+            order__status='completed'
         ).exists()
         
         review = form.save(commit=False)
         review.product = product
         review.user = self.request.user
         review.is_verified_purchase = has_purchased
+        
+        # Automatically approve reviews
+        review.is_approved = True
+        
         review.save()
         
-        messages.success(self.request, 'Cảm ơn bạn đã đánh giá sản phẩm!')
+        messages.success(self.request, _('Review submitted successfully'))
         return super().form_valid(form)
-
-    def get_success_url(self):
-        return reverse('products:detail', kwargs={'pk': self.object.product.id})
 
 class ReviewUpdateView(LoginRequiredMixin, UpdateView):
     model = Review
@@ -107,15 +114,23 @@ class ReviewResponseCreateView(LoginRequiredMixin, CreateView):
 def mark_helpful(request, review_id):
     review = get_object_or_404(Review, id=review_id)
     
-    if request.user not in review.helpful_votes.all():
-        review.helpful_votes.add(request.user)
-        review.helpful_count = review.helpful_votes.count()
-        review.save()
-        messages.success(request, _('Review marked as helpful'))
-    else:
+    # Toggle helpful status
+    if request.user in review.helpful_votes.all():
         review.helpful_votes.remove(request.user)
-        review.helpful_count = review.helpful_votes.count()
-        review.save()
-        messages.success(request, _('Helpful vote removed'))
+        user_voted = False
+    else:
+        review.helpful_votes.add(request.user)
+        user_voted = True
     
-    return redirect('reviews:detail', pk=review.id)
+    # Trả về JSON response nếu là AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({
+            'status': 'success',
+            'helpful_votes': review.helpful_count,
+            'helpful_count': review.helpful_count,
+            'user_voted': user_voted
+        })
+    
+    messages.success(request, _('Thank you for your feedback!'))
+    # Redirect to product detail page instead of review detail page
+    return redirect('products:detail', pk=review.product.id)

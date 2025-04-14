@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
-from .models import Product, Category, ProductScreenshot
+from .models import Product, Category, ProductScreenshot, FAQ, Wishlist
 
 # Inline cho Screenshots
 class ProductScreenshotInline(admin.TabularInline):
@@ -8,6 +8,11 @@ class ProductScreenshotInline(admin.TabularInline):
     extra = 1
     verbose_name = _('Screenshot')
     verbose_name_plural = _('Screenshots')
+
+class FAQInline(admin.TabularInline):
+    model = FAQ
+    extra = 1
+    fields = ['question', 'answer', 'category', 'is_active']
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
@@ -19,7 +24,9 @@ class ProductAdmin(admin.ModelAdmin):
         'license_type', 
         'price', 
         'is_active', 
-        'created_at'
+        'created_at',
+        'average_rating',
+        'total_reviews'
     )
     
     # Các trường để lọc
@@ -36,14 +43,15 @@ class ProductAdmin(admin.ModelAdmin):
         'name', 
         'description', 
         'version',
-        'supported_platforms'
+        'supported_platforms',
+        'developer__username'
     )
     
     # Tạo slug tự động
     prepopulated_fields = {'slug': ('name',)}
     
     # Thêm inline screenshots
-    inlines = [ProductScreenshotInline]
+    inlines = [ProductScreenshotInline, FAQInline]
     
     # Các nhóm trường để hiển thị
     fieldsets = (
@@ -76,6 +84,7 @@ class ProductAdmin(admin.ModelAdmin):
         (_('Media and Links'), {
             'fields': (
                 'thumbnail', 
+                'thumbnail_tag',
                 'demo_url', 
                 'download_url'
             )
@@ -85,17 +94,56 @@ class ProductAdmin(admin.ModelAdmin):
                 'download_count', 
                 'release_date'
             )
+        }),
+        (_('Ratings'), {
+            'fields': (
+                'average_rating',
+                'total_reviews'
+            )
         })
     )
 
+    readonly_fields = ['thumbnail_tag', 'average_rating', 'total_reviews']
+
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ('name', 'parent', 'created_at')
-    list_filter = ('created_at',)
+    list_display = ('name', 'parent', 'created_at', 'is_active')
+    list_filter = ('created_at', 'is_active')
     search_fields = ('name', 'description')
     prepopulated_fields = {'slug': ('name',)}
+    readonly_fields = ['image_tag']
+    
+    fieldsets = (
+        (_('Basic Information'), {
+            'fields': (
+                'name', 
+                'slug', 
+                'description', 
+                'parent',
+                'is_active'
+            )
+        }),
+        (_('Media'), {
+            'fields': (
+                'icon',
+                'image_tag'
+            )
+        })
+    )
 
 @admin.register(ProductScreenshot)
 class ProductScreenshotAdmin(admin.ModelAdmin):
     list_display = ('product', 'caption', 'order')
     list_filter = ('product',)
+
+@admin.register(Wishlist)
+class WishlistAdmin(admin.ModelAdmin):
+    list_display = ['user', 'product', 'added_at']
+    list_filter = ['added_at']
+    search_fields = ['user__username', 'product__name']
+
+@admin.register(FAQ)
+class FAQAdmin(admin.ModelAdmin):
+    list_display = ['question', 'category', 'product', 'is_active']
+    list_filter = ['category', 'is_active']
+    search_fields = ['question', 'answer', 'product__name']

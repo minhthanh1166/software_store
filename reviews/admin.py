@@ -4,7 +4,7 @@ from .models import Review, ReviewResponse
 
 @admin.register(Review)
 class ReviewAdmin(admin.ModelAdmin):
-    list_display = ['product', 'user', 'rating', 'title', 'is_verified_purchase', 'helpful_votes', 'is_approved', 'created_at']
+    list_display = ['product', 'user', 'rating', 'title', 'is_verified_purchase', 'helpful_count', 'is_approved', 'created_at']
     list_filter = ['rating', 'is_verified_purchase', 'is_approved', 'created_at']
     search_fields = ['product__name', 'user__email', 'title', 'content']
     actions = ['approve_reviews', 'unapprove_reviews']
@@ -16,6 +16,11 @@ class ReviewAdmin(admin.ModelAdmin):
     def unapprove_reviews(self, request, queryset):
         queryset.update(is_approved=False)
     unapprove_reviews.short_description = _('Unapprove selected reviews')
+    
+    def save_model(self, request, obj, form, change):
+        # Automatically approve all reviews
+        obj.is_approved = True
+        super().save_model(request, obj, form, change)
 
 @admin.register(ReviewResponse)
 class ReviewResponseAdmin(admin.ModelAdmin):

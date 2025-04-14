@@ -3,6 +3,8 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.text import slugify
 from django.core.validators import MinValueValidator
 from accounts.models import User
+from django.db.models import Count
+from django.utils.safestring import mark_safe
 
 # Create your models here.
 class Category(models.Model):
@@ -14,6 +16,7 @@ class Category(models.Model):
     description = models.TextField(_('description'), blank=True)
     icon = models.ImageField(upload_to='category_icons/', blank=True, null=True)
     parent = models.ForeignKey('self', on_delete=models.CASCADE, blank=True, null=True, related_name='children')
+    is_active = models.BooleanField(_('is active'), default=True)
 
     # Fields cho việc theo dõi
     created_at = models.DateTimeField(auto_now_add=True)
@@ -31,6 +34,13 @@ class Category(models.Model):
         if not self.slug:
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
+    
+    def image_tag(self):
+        if self.icon:
+            return mark_safe(f'<img src="{self.icon.url}" width="50" height="50" />')
+        return ""
+    
+    image_tag.short_description = 'Icon Preview'
 
 class Product(models.Model):
     SOFTWARE_TYPES = (
@@ -93,30 +103,46 @@ class Product(models.Model):
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
     
+    def thumbnail_tag(self):
+        if self.thumbnail:
+            return mark_safe(f'<img src="{self.thumbnail.url}" width="50" height="50" />')
+        return ""
+    
+    thumbnail_tag.short_description = 'Thumbnail Preview'
+
+    @property
+    def rating_distribution(self):
+        """Tính phân bố điểm đánh giá (số lượng mỗi sao)"""
+        from django.db.models import Count
+        
+        # Khởi tạo từ điển với đầy đủ các giá trị từ 1-5
+        distribution = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        
+        # Lấy phân bố đánh giá từ database
+        reviews_distribution = self.reviews_set.filter(is_approved=True) \
+            .values('rating') \
+            .annotate(count=Count('id')) \
+            .values_list('rating', 'count')
+        
+        # Cập nhật dict với dữ liệu thực tế
+        for rating, count in reviews_distribution:
+            distribution[rating] = count
+        
+        return distribution
+
     @property
     def average_rating(self):
         """Tính điểm đánh giá trung bình của sản phẩm"""
-        reviews = self.product_reviews.filter(is_approved=True)
+        reviews = self.reviews_set.filter(is_approved=True)
         if reviews.exists():
             total_rating = sum(review.rating for review in reviews)
             return round(total_rating / reviews.count(), 1)
         return 0
-    
-    @property
-    def rating_distribution(self):
-        """Tính phân bố điểm đánh giá (số lượng mỗi sao)"""
-        distribution = {i: 0 for i in range(1, 6)}
-        reviews = self.product_reviews.filter(is_approved=True)
-        
-        for review in reviews:
-            distribution[review.rating] += 1
-            
-        return distribution
-    
+
     @property
     def total_reviews(self):
         """Tổng số đánh giá đã được duyệt"""
-        return self.product_reviews.filter(is_approved=True).count()
+        return self.reviews_set.filter(is_approved=True).count()
 
 class ProductScreenshot(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='screenshots')
@@ -459,6 +485,7 @@ class FAQ(models.Model):
         ('technical', _('Technical Support')),
     )
 
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='faqs', null=True, blank=True)
     question = models.CharField(_('question'), max_length=255)
     answer = models.TextField(_('answer'))
     category = models.CharField(_('category'), max_length=20, choices=CATEGORIES)

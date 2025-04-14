@@ -50,7 +50,7 @@
                                     </button>
                                     <div class="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 hidden" role="menu" id="user-menu">
                                         <a href="{% url 'accounts:profile' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Your Profile</a>
-                                        <a href="{% url 'accounts:logout' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Sign out</a>
+                                        <button id="logout-button" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Sign out</button>
                                     </div>
                                 </div>
                             </div>
@@ -101,6 +101,17 @@
             document.addEventListener('click', (e) => {
                 if (!userMenuButton.contains(e.target) && !userMenu.contains(e.target)) {
                     userMenu.classList.add('hidden');
+                }
+            });
+        }
+        
+        // Handle logout with confirmation
+        const logoutButton = document.getElementById('logout-button');
+        if (logoutButton) {
+            logoutButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (confirm('Bạn có chắc chắn muốn đăng xuất?')) {
+                    window.location.href = "{% url 'accounts:logout' %}";
                 }
             });
         }
