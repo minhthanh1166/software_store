@@ -1,4 +1,33 @@
-/venv
-/__pycache__
+# Bỏ qua thư mục ảo venv
+venv/
+ENV/
+env/
+.venv/
+
+# Bỏ qua các file biên dịch Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# Bỏ qua các file môi trường
 .env
-# vào bên trong thư mục __pycache__
+*.env
+
+# Bỏ qua các file SQLite (nếu có)
+*.sqlite3
+
+# Bỏ qua file migrations nếu muốn (tuỳ theo chính sách nhóm)
+# */migrations/
+
+# Bỏ qua các file log, backup
+*.log
+*.bak
+
+# Bỏ các IDE configs
+.vscode/
+.idea/
+
+# Bỏ các tệp hệ thống
+.DS_Store
+Thumbs.db
