@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load static %}
+{% load currency_tags %}
+
+{% block title %}{% trans "Đơn hàng của tôi" %} - Software Store{% endblock %}
+
+{% block content %}
+<div class="bg-white">
+    <div class="max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:pb-24 lg:px-8">
+        <div class="max-w-xl">
+            <h1 class="text-2xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">{% trans "Đơn hàng của tôi" %}</h1>
+            <p class="mt-2 text-sm text-gray-500">{% trans "Kiểm tra trạng thái đơn hàng và tải phần mềm của bạn." %}</p>
+        </div>
+
+        <div class="mt-16">
+            {% if orders %}
+                <div class="space-y-20">
+                    {% for order in orders %}
+                        <div>
+                            <h3 class="sr-only">{% trans "Đơn hàng đặt ngày" %} {{ order.created_at|date:"d/m/Y" }}</h3>
+                            <div class="bg-gray-50 rounded-lg py-6 px-4 sm:px-6 sm:flex sm:items-center sm:justify-between sm:space-x-6 lg:space-x-8">
+                                <dl class="divide-y divide-gray-200 space-y-6 text-sm text-gray-600 flex-auto sm:divide-y-0 sm:space-y-0 sm:grid sm:grid-cols-4 sm:gap-x-6 lg:gap-x-8">
+                                    <div class="flex justify-between sm:block">
+                                        <dt class="font-medium text-gray-900">{% trans "Mã đơn hàng" %}</dt>
+                                        <dd class="sm:mt-1">#{{ order.id }}</dd>
+                                    </div>
+                                    <div class="flex justify-between pt-6 sm:block sm:pt-0">
+                                        <dt class="font-medium text-gray-900">{% trans "Ngày đặt" %}</dt>
+                                        <dd class="sm:mt-1">{{ order.created_at|date:"d/m/Y" }}</dd>
+                                    </div>
+                                    <div class="flex justify-between pt-6 sm:block sm:pt-0">
+                                        <dt class="font-medium text-gray-900">{% trans "Tổng tiền" %}</dt>
+                                        <dd class="sm:mt-1">{{ order.total_amount|currency }}</dd>
+                                    </div>
+                                    <div class="flex justify-between pt-6 sm:block sm:pt-0">
+                                        <dt class="font-medium text-gray-900">{% trans "Trạng thái" %}</dt>
+                                        <dd class="sm:mt-1">
+                                            {% if order.status == 'completed' %}
+                                                <span class="px-2 py-1 text-green-800 text-xs font-medium bg-green-100 rounded-full">{% trans "Hoàn thành" %}</span>
+                                            {% elif order.status == 'pending' %}
+                                                <span class="px-2 py-1 text-yellow-800 text-xs font-medium bg-yellow-100 rounded-full">{% trans "Chờ thanh toán" %}</span>
+                                            {% elif order.status == 'processing' %}
+                                                <span class="px-2 py-1 text-blue-800 text-xs font-medium bg-blue-100 rounded-full">{% trans "Đang xử lý" %}</span>
+                                            {% elif order.status == 'cancelled' %}
+                                                <span class="px-2 py-1 text-red-800 text-xs font-medium bg-red-100 rounded-full">{% trans "Đã hủy" %}</span>
+                                            {% else %}
+                                                <span class="px-2 py-1 text-gray-800 text-xs font-medium bg-gray-100 rounded-full">{{ order.status }}</span>
+                                            {% endif %}
+                                        </dd>
+                                    </div>
+                                </dl>
+                                <a href="{% url 'orders:detail' order.id %}" class="mt-6 flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 sm:mt-0 sm:w-auto">
+                                    {% trans "Xem chi tiết" %}<span class="sr-only">{% trans "đơn hàng" %} {{ order.id }}</span>
+                                </a>
+                            </div>
+
+                            <table class="mt-4 w-full text-gray-500 sm:mt-6">
+                                <thead class="sr-only text-sm text-gray-500 text-left sm:not-sr-only">
+                                    <tr>
+                                        <th scope="col" class="sm:w-2/5 lg:w-1/3 pr-8 py-3 font-normal">{% trans "Sản phẩm" %}</th>
+                                        <th scope="col" class="hidden w-1/5 pr-8 py-3 font-normal sm:table-cell">{% trans "License Key" %}</th>
+                                        <th scope="col" class="hidden pr-8 py-3 font-normal sm:table-cell">{% trans "Giá" %}</th>
+                                        <th scope="col" class="w-0 py-3 font-normal text-right">{% trans "Tải xuống" %}</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="border-b border-gray-200 divide-y divide-gray-200 text-sm sm:border-t">
+                                    {% for item in order.items.all %}
+                                        <tr>
+                                            <td class="py-6 pr-8">
+                                                <div class="flex items-center">
+                                                    <img src="{{ item.product.thumbnail.url }}" alt="{{ item.product.name }}" class="w-16 h-16 object-center object-cover rounded mr-6">
+                                                    <div>
+                                                        <div class="font-medium text-gray-900">{{ item.product.name }}</div>
+                                                        <div class="mt-1 sm:hidden">{{ item.price|currency }}</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="hidden py-6 pr-8 sm:table-cell">
+                                                {% if item.license_key %}
+                                                    <code class="text-sm bg-gray-100 px-2 py-1 rounded">{{ item.license_key }}</code>
+                                                {% else %}
+                                                    <span class="text-gray-400">{% trans "Chưa kích hoạt" %}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="hidden py-6 pr-8 sm:table-cell">{{ item.price|currency }}</td>
+                                            <td class="py-6 font-medium text-right whitespace-nowrap">
+                                                {% if order.status == 'completed' and item.download_url %}
+                                                    <a href="{{ item.download_url }}" class="text-indigo-600 hover:text-indigo-500">
+                                                        {% trans "Tải xuống" %}<span class="hidden lg:inline"> {% trans "phần mềm" %}</span>
+                                                        <span class="sr-only">, {{ item.product.name }}</span>
+                                                    </a>
+                                                {% else %}
+                                                    <span class="text-gray-400">{% trans "Chưa khả dụng" %}</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-12">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                    </svg>
+                    <h3 class="mt-2 text-sm font-medium text-gray-900">{% trans "Chưa có đơn hàng nào" %}</h3>
+                    <p class="mt-1 text-sm text-gray-500">{% trans "Bắt đầu mua sắm để tạo đơn hàng đầu tiên của bạn." %}</p>
+                    <div class="mt-6">
+                        <a href="{% url 'products:list' %}" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            {% trans "Xem sản phẩm" %}
+                        </a>
+                        <a href="{% url 'cart:cart_detail' %}" class="ml-3 inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            {% trans "Giỏ hàng" %}
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

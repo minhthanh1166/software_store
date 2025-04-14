@@ -1,0 +1,343 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Đánh giá sản phẩm {{ product.name }} - Software Store{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+    <div class="bg-white shadow-xl rounded-2xl overflow-hidden">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-indigo-600 to-indigo-800 px-6 py-5">
+            <h2 class="text-xl font-bold text-white flex items-center">
+                <svg class="h-6 w-6 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                </svg>
+                Đánh giá sản phẩm
+            </h2>
+        </div>
+        
+        <!-- Product Info -->
+        <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <div class="flex items-center">
+                {% if product.thumbnail %}
+                    <img src="{{ product.thumbnail.url }}" alt="{{ product.name }}" class="h-24 w-24 object-cover rounded-lg shadow mr-4">
+                {% else %}
+                    <div class="h-24 w-24 bg-gray-200 rounded-lg shadow mr-4 flex items-center justify-center">
+                        <svg class="h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                    </div>
+                {% endif %}
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">{{ product.name }}</h3>
+                    <div class="flex items-center text-sm text-gray-500 mt-1">
+                        <span class="flex items-center">
+                            <svg class="h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                            </svg>
+                            {{ product.category.name }}
+                        </span>
+                        <span class="mx-2 text-gray-300">|</span>
+                        <span class="flex items-center">
+                            <svg class="h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                            </svg>
+                            Phiên bản {{ product.version }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Container -->
+        <div class="px-6 py-6">
+            <form method="post" class="space-y-6">
+                {% csrf_token %}
+                
+                <!-- Error Messages -->
+                {% if form.errors %}
+                    <div class="rounded-md bg-red-50 p-4 shadow-sm">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <h3 class="text-sm font-medium text-red-800">Một số lỗi cần được khắc phục:</h3>
+                                <div class="mt-2 text-sm text-red-700">
+                                    <ul class="list-disc pl-5 space-y-1">
+                                        {% for field, errors in form.errors.items %}
+                                            {% for error in errors %}
+                                                <li>{{ error }}</li>
+                                            {% endfor %}
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+                
+                <!-- System Messages -->
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="rounded-md bg-blue-50 p-4 shadow-sm">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <svg class="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                                    </svg>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm text-blue-700">{{ message }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+                
+                <!-- Rating Field -->
+                <div class="bg-gray-50 p-5 rounded-xl shadow-sm">
+                    <label class="block text-sm font-medium text-gray-700 mb-4 flex items-center">
+                        <svg class="h-5 w-5 text-yellow-400 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                        Đánh giá của bạn
+                    </label>
+                    <div class="flex justify-center">
+                        <div class="rating-stars flex flex-row-reverse space-x-2 space-x-reverse">
+                            <!-- 5 sao -->
+                            <div class="rating-option">
+                                <input type="radio" name="{{ form.rating.name }}" id="rating5" value="5" class="hidden"
+                                       {% if form.rating.value == '5' %}checked{% endif %}>
+                                <label for="rating5" class="cursor-pointer" data-rating="5">
+                                    <svg class="h-8 w-8 transition-transform duration-200 ease-in-out transform hover:scale-110" 
+                                         xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                    </svg>
+                                </label>
+                            </div>
+                            <!-- 4 sao -->
+                            <div class="rating-option">
+                                <input type="radio" name="{{ form.rating.name }}" id="rating4" value="4" class="hidden"
+                                       {% if form.rating.value == '4' %}checked{% endif %}>
+                                <label for="rating4" class="cursor-pointer" data-rating="4">
+                                    <svg class="h-8 w-8 transition-transform duration-200 ease-in-out transform hover:scale-110" 
+                                         xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                    </svg>
+                                </label>
+                            </div>
+                            <!-- 3 sao -->
+                            <div class="rating-option">
+                                <input type="radio" name="{{ form.rating.name }}" id="rating3" value="3" class="hidden"
+                                       {% if form.rating.value == '3' %}checked{% endif %}>
+                                <label for="rating3" class="cursor-pointer" data-rating="3">
+                                    <svg class="h-8 w-8 transition-transform duration-200 ease-in-out transform hover:scale-110" 
+                                         xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                    </svg>
+                                </label>
+                            </div>
+                            <!-- 2 sao -->
+                            <div class="rating-option">
+                                <input type="radio" name="{{ form.rating.name }}" id="rating2" value="2" class="hidden"
+                                       {% if form.rating.value == '2' %}checked{% endif %}>
+                                <label for="rating2" class="cursor-pointer" data-rating="2">
+                                    <svg class="h-8 w-8 transition-transform duration-200 ease-in-out transform hover:scale-110" 
+                                         xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                    </svg>
+                                </label>
+                            </div>
+                            <!-- 1 sao -->
+                            <div class="rating-option">
+                                <input type="radio" name="{{ form.rating.name }}" id="rating1" value="1" class="hidden"
+                                       {% if form.rating.value == '1' %}checked{% endif %}>
+                                <label for="rating1" class="cursor-pointer" data-rating="1">
+                                    <svg class="h-8 w-8 transition-transform duration-200 ease-in-out transform hover:scale-110" 
+                                         xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                    </svg>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-center text-sm" id="rating-text">
+                        <span class="text-gray-500">Chọn đánh giá của bạn</span>
+                    </div>
+                </div>
+                
+                <!-- Title Field -->
+                <div>
+                    <label for="title" class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                        <svg class="h-5 w-5 text-gray-400 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        Tiêu đề đánh giá
+                    </label>
+                    <div class="mt-1 relative rounded-md shadow-sm">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                        </div>
+                        <input type="text" name="{{ form.title.name }}" id="title" 
+                               class="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 pr-3 py-3 border-gray-300 rounded-md shadow-sm placeholder-gray-400"
+                               placeholder="Nhập tiêu đề ngắn gọn về trải nghiệm của bạn"
+                               value="{{ form.title.value|default:'' }}">
+                    </div>
+                    {% if form.title.errors %}
+                        <p class="mt-2 text-sm text-red-600">
+                            {{ form.title.errors.0 }}
+                        </p>
+                    {% endif %}
+                </div>
+                
+                <!-- Content Field -->
+                <div>
+                    <label for="content" class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                        <svg class="h-5 w-5 text-gray-400 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                        </svg>
+                        Chi tiết đánh giá
+                    </label>
+                    <div class="mt-1">
+                        <textarea id="content" name="{{ form.content.name }}" rows="5"
+                                  class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md p-3"
+                                  placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm này...">{{ form.content.value|default:'' }}</textarea>
+                    </div>
+                    {% if form.content.errors %}
+                        <p class="mt-2 text-sm text-red-600">
+                            {{ form.content.errors.0 }}
+                        </p>
+                    {% endif %}
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="flex justify-end space-x-3 pt-4">
+                    <a href="{% url 'products:detail' product.id %}" 
+                       class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out transform hover:-translate-y-0.5">
+                        <svg class="h-5 w-5 mr-2 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                        </svg>
+                        Quay lại
+                    </a>
+                    <button type="submit" 
+                            class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out transform hover:-translate-y-0.5">
+                        <svg class="h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                        </svg>
+                        Gửi đánh giá
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .rating-stars {
+        display: flex;
+        flex-direction: row-reverse;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+    .rating-option {
+        position: relative;
+    }
+    .rating-option label {
+        color: #d1d5db;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .rating-option input:checked ~ label svg {
+        color: #fbbf24;
+    }
+    .rating-option:hover label svg {
+        transform: scale(1.2);
+    }
+    .rating-option:hover label svg,
+    .rating-option:hover ~ .rating-option label svg {
+        color: #fbbf24;
+    }
+    .rating-option input:checked + label svg {
+        transform: scale(1.2);
+    }
+    /* Thêm style cho sao chưa được chọn */
+    .rating-option label svg {
+        color: #d1d5db;
+    }
+    /* Style cho sao đã được chọn */
+    .rating-option.selected label svg,
+    .rating-option.selected ~ .rating-option label svg {
+        color: #fbbf24;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const ratingOptions = document.querySelectorAll('.rating-option');
+        const ratingText = document.getElementById('rating-text').querySelector('span');
+        const ratingTexts = {
+            '5': '<span class="text-green-600 font-medium">Tuyệt vời!</span> Sản phẩm hoàn hảo',
+            '4': '<span class="text-green-500 font-medium">Rất tốt</span> Hài lòng với sản phẩm',
+            '3': '<span class="text-yellow-500 font-medium">Bình thường</span> Đáp ứng cơ bản',
+            '2': '<span class="text-orange-500 font-medium">Không hài lòng</span> Cần cải thiện',
+            '1': '<span class="text-red-500 font-medium">Thất vọng</span> Không đáp ứng yêu cầu'
+        };
+
+        // Hàm cập nhật trạng thái sao
+        function updateStars(selectedRating) {
+            ratingOptions.forEach(option => {
+                const input = option.querySelector('input');
+                const rating = input.value;
+                if (rating <= selectedRating) {
+                    option.classList.add('selected');
+                } else {
+                    option.classList.remove('selected');
+                }
+            });
+        }
+
+        // Khởi tạo trạng thái ban đầu
+        const checkedInput = document.querySelector('.rating-option input:checked');
+        if (checkedInput) {
+            updateStars(checkedInput.value);
+            ratingText.innerHTML = ratingTexts[checkedInput.value];
+        }
+
+        // Xử lý sự kiện hover
+        ratingOptions.forEach(option => {
+            const label = option.querySelector('label');
+            const input = option.querySelector('input');
+
+            // Hover vào
+            option.addEventListener('mouseenter', function() {
+                const rating = input.value;
+                updateStars(rating);
+                ratingText.innerHTML = ratingTexts[rating];
+            });
+
+            // Hover ra
+            option.addEventListener('mouseleave', function() {
+                const checkedInput = document.querySelector('.rating-option input:checked');
+                if (checkedInput) {
+                    updateStars(checkedInput.value);
+                    ratingText.innerHTML = ratingTexts[checkedInput.value];
+                } else {
+                    ratingOptions.forEach(opt => opt.classList.remove('selected'));
+                    ratingText.innerHTML = '<span class="text-gray-500">Chọn đánh giá của bạn</span>';
+                }
+            });
+
+            // Click chọn sao
+            input.addEventListener('change', function() {
+                updateStars(this.value);
+                ratingText.innerHTML = ratingTexts[this.value];
+            });
+        });
+    });
+</script>
+{% endblock %}

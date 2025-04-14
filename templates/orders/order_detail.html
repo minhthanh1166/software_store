@@ -1,114 +1,349 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load currency_tags %}
+{% load i18n %}
 
-{% block title %}Order #{{ order.id }} - Software Store{% endblock %}
+{% block title %}{% trans "Chi tiết đơn hàng" %} #{{ order.id }} - Software Store{% endblock %}
 
 {% block content %}
-<div class="bg-white">
-    <div class="max-w-3xl mx-auto py-16 px-4 sm:py-24 sm:px-6 lg:px-8">
-        <div class="max-w-xl">
-            <h1 class="text-sm font-semibold uppercase tracking-wide text-indigo-600">Thank you!</h1>
-            <p class="mt-2 text-4xl font-extrabold tracking-tight sm:text-5xl">Order #{{ order.id }}</p>
-            <p class="mt-2 text-base text-gray-500">Your order was placed on {{ order.created_at|date:"F j, Y" }} and is currently being processed.</p>
+<div class="bg-white shadow overflow-hidden sm:rounded-lg max-w-6xl mx-auto mt-8">
+    <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+        <div class="flex justify-between items-center">
+            <div>
+                <h3 class="text-lg leading-6 font-medium text-gray-900">
+                    {% trans "Đơn hàng" %} #{{ order.id }}
+                </h3>
+                <p class="mt-1 max-w-2xl text-sm text-gray-500">
+                    {% trans "Đặt ngày" %} {{ order.created_at|date:"d/m/Y H:i" }}
+                </p>
+            </div>
+            <div>
+                <span class="px-3 py-1 text-sm font-medium rounded-full {{ payment_status.class }}">
+                    {{ payment_status.text }}
+                </span>
+            </div>
         </div>
+    </div>
 
-        <div class="mt-10 border-t border-gray-200">
-            <h2 class="sr-only">Your order</h2>
+    <div class="border-t border-gray-200">
+        <dl>
+            <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt class="text-sm font-medium text-gray-500">{% trans "Tổng tiền" %}</dt>
+                <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ order.total_amount|currency }}</dd>
+            </div>
+            <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt class="text-sm font-medium text-gray-500">{% trans "Phương thức thanh toán" %}</dt>
+                <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    {% if order.payment_method == 'sepay' %}
+                        SePay
+                    {% elif order.payment_method == 'bank' %}
+                        {% trans "Chuyển khoản ngân hàng" %}
+                    {% else %}
+                        {{ order.payment_method }}
+                    {% endif %}
+                </dd>
+            </div>
+            <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt class="text-sm font-medium text-gray-500">{% trans "Trạng thái thanh toán" %}</dt>
+                <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    <span class="px-2 py-1 text-xs font-medium rounded-full {{ payment_status.class }}">
+                        {{ payment_status.text }}
+                    </span>
+                </dd>
+            </div>
+            <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt class="text-sm font-medium text-gray-500">{% trans "Ngày tạo" %}</dt>
+                <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ order.created_at|date:"d/m/Y H:i" }}</dd>
+            </div>
+            {% if order.transaction_id and order.transaction_id != 'TEMP-' %}
+            <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt class="text-sm font-medium text-gray-500">{% trans "Mã giao dịch" %}</dt>
+                <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ order.transaction_id }}</dd>
+            </div>
+            {% endif %}
+        </dl>
+    </div>
 
-            <h3 class="sr-only">Items</h3>
-            <div class="py-10 border-b border-gray-200">
-                <div class="flex space-x-6">
-                    {% for item in order.items.all %}
-                        <div class="flex-shrink-0 w-20 h-20 bg-gray-200 rounded-lg overflow-hidden sm:w-24 sm:h-24">
-                            <img src="{{ item.product.thumbnail.url }}" alt="{{ item.product.name }}" class="w-full h-full object-center object-cover">
-                        </div>
-
-                        <div class="flex-1 flex flex-col">
-                            <div>
-                                <div class="flex justify-between">
-                                    <h4 class="text-sm">
-                                        <a href="{% url 'products:detail' item.product.id %}" class="font-medium text-gray-900 hover:text-gray-800">
-                                            {{ item.product.name }}
-                                        </a>
-                                    </h4>
-                                    <p class="ml-4 text-sm font-medium text-gray-900">${{ item.price }}</p>
-                                </div>
-                                <p class="mt-1 text-sm text-gray-500">{{ item.product.category.name }}</p>
-                            </div>
-
-                            <div class="flex-1 flex items-end justify-between">
-                                <p class="mt-1 text-sm font-medium text-gray-500">Qty {{ item.quantity }}</p>
-                            </div>
-                        </div>
-                    {% endfor %}
+    <!-- Bank transfer instructions for bank payment method and pending status -->
+    {% if order.payment_method == 'bank' and order.status == 'pending' %}
+    <div class="px-4 py-5 sm:px-6 border-t border-gray-200 bg-blue-50">
+        <h4 class="text-lg font-medium text-blue-900 mb-2">{% trans "Hướng dẫn thanh toán chuyển khoản" %}</h4>
+        <div class="space-y-4 text-sm">
+            <p class="text-blue-700">{% trans "Vui lòng chuyển khoản với nội dung sau:" %}</p>
+            
+            <div class="bg-white p-4 rounded-md border border-blue-200 space-y-2">
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="text-blue-800 font-medium">{% trans "Ngân hàng:" %}</div>
+                    <div class="col-span-2">Vietcombank</div>
+                </div>
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="text-blue-800 font-medium">{% trans "Số tài khoản:" %}</div>
+                    <div class="col-span-2">1234567890</div>
+                </div>
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="text-blue-800 font-medium">{% trans "Chủ tài khoản:" %}</div>
+                    <div class="col-span-2">CÔNG TY PHẦN MỀM XYZ</div>
+                </div>
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="text-blue-800 font-medium">{% trans "Số tiền:" %}</div>
+                    <div class="col-span-2 font-bold">{{ order.total_amount|currency }}</div>
+                </div>
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="text-blue-800 font-medium">{% trans "Nội dung CK:" %}</div>
+                    <div class="col-span-2 font-mono font-medium">THANHTOAN {{ order.id }}</div>
                 </div>
             </div>
-
-            <div class="sm:ml-40 sm:pl-6">
-                <h3 class="sr-only">Your information</h3>
-
-                <h4 class="sr-only">Addresses</h4>
-                <dl class="grid grid-cols-2 gap-x-6 py-10 text-sm">
-                    <div>
-                        <dt class="font-medium text-gray-900">Billing address</dt>
-                        <dd class="mt-2 text-gray-700">
-                            <address class="not-italic">
-                                {{ order.billing_first_name }} {{ order.billing_last_name }}<br>
-                                {{ order.billing_address }}<br>
-                                {{ order.billing_city }}, {{ order.billing_postal_code }}<br>
-                                {{ order.billing_country }}
-                            </address>
-                        </dd>
-                    </div>
-                </dl>
-
-                <h4 class="sr-only">Payment</h4>
-                <dl class="grid grid-cols-2 gap-x-6 border-t border-gray-200 py-10 text-sm">
-                    <div>
-                        <dt class="font-medium text-gray-900">Payment method</dt>
-                        <dd class="mt-2 text-gray-700">
-                            <div class="flex-auto">
-                                <p class="text-gray-900">{{ order.payment_method }}</p>
-                                <p class="text-gray-500">Paid on {{ order.paid_at|date:"F j, Y" }}</p>
-                            </div>
-                        </dd>
-                    </div>
-                    <div>
-                        <dt class="font-medium text-gray-900">Payment status</dt>
-                        <dd class="mt-2 text-gray-700">
-                            <div class="flex-auto">
-                                <p class="text-gray-900">{{ order.get_payment_status_display }}</p>
-                                <p class="text-gray-500">Order #{{ order.id }}</p>
-                            </div>
-                        </dd>
-                    </div>
-                </dl>
-
-                <h3 class="sr-only">Summary</h3>
-
-                <dl class="space-y-6 border-t border-gray-200 pt-10 text-sm">
-                    <div class="flex justify-between">
-                        <dt class="font-medium text-gray-900">Subtotal</dt>
-                        <dd class="text-gray-700">${{ order.subtotal }}</dd>
-                    </div>
-                    <div class="flex justify-between">
-                        <dt class="font-medium text-gray-900">Total</dt>
-                        <dd class="text-gray-900">${{ order.total }}</dd>
-                    </div>
-                </dl>
-            </div>
+            
+            <p class="text-blue-700">{% trans "Sau khi thanh toán, vui lòng thông báo cho chúng tôi qua email: payment@example.com hoặc hotline: 1900 1234" %}</p>
+            <p class="text-blue-700">{% trans "Đơn hàng của bạn sẽ được xử lý sau khi chúng tôi xác nhận thanh toán (trong vòng 24 giờ làm việc)." %}</p>
         </div>
+    </div>
+    {% endif %}
 
-        <div class="mt-10 border-t border-gray-200 pt-6">
-            <div class="flex space-x-4">
-                <a href="{% url 'products:list' %}" class="text-sm font-medium text-indigo-600 hover:text-indigo-500">
-                    Continue Shopping<span aria-hidden="true"> &rarr;</span>
-                </a>
-                <a href="{% url 'orders:list' %}" class="text-sm font-medium text-indigo-600 hover:text-indigo-500">
-                    View all orders<span aria-hidden="true"> &rarr;</span>
-                </a>
+    <div class="px-4 py-5 sm:px-6 border-t border-gray-200">
+        <h4 class="text-lg font-medium text-gray-900">{% trans "Sản phẩm" %}</h4>
+        <div class="mt-4 space-y-4">
+            {% for item in order.items.all %}
+            <div class="border-t border-gray-200 pt-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <img src="{{ item.product.thumbnail.url }}" alt="{{ item.product.name }}" class="w-16 h-16 object-cover rounded">
+                        <div class="ml-4">
+                            <h5 class="text-sm font-medium text-gray-900">{{ item.product.name }}</h5>
+                            <p class="text-sm text-gray-500">{{ item.price|currency }}</p>
+                            {% if item.license_key %}
+                            <p class="mt-1">
+                                <span class="text-xs font-medium text-gray-500">{% trans "License key:" %}</span>
+                                <code class="ml-2 px-2 py-1 text-xs bg-gray-100 rounded">{{ item.license_key }}</code>
+                            </p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if order.status == 'completed' and item.download_url %}
+                    <a href="{{ item.download_url }}" class="ml-4 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        {% trans "Tải xuống" %}
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="px-4 py-5 sm:px-6 border-t border-gray-200">
+        <div class="flex justify-between items-center">
+            <a href="{% url 'orders:list' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                {% trans "Quay lại danh sách" %}
+            </a>
+            {% if payment_status.show_payment_button %}
+            <button id="payment-btn" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                {% trans "Tiếp tục thanh toán" %}
+            </button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal Thanh toán -->
+{% if order.payment_method == 'sepay' and order.status == 'pending' %}
+<div id="payment-modal" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 hidden">
+    <div class="bg-white p-8 rounded-lg shadow-xl max-w-md w-full">
+        <div class="flex justify-between items-start">
+            <h3 class="text-lg font-medium text-gray-900">{% trans "Thanh toán đơn hàng" %} #{{ order.id }}</h3>
+            <button id="close-modal" class="text-gray-400 hover:text-gray-500">
+                <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <div class="mt-4">
+            <p class="text-sm text-gray-500 mb-4">{% trans "Quét mã QR bên dưới để thanh toán đơn hàng của bạn:" %}</p>
+            <div class="flex flex-col items-center">
+                <div class="bg-gray-100 p-4 rounded-lg">
+                    {# Sử dụng API SePay để tạo mã QR thanh toán #}
+                    <img id="qr-code" src="https://qr.sepay.vn/img?acc=96247TT123&bank=BIDV&amount={{ order.total_amount|floatformat:'0' }}&des=DH{{ order.id }}" alt="QR Code" class="w-48 h-48">
+                </div>
+                <p class="mt-4 text-sm text-gray-700 text-center">{% trans "Số tiền:" %} <span class="font-bold">{{ order.total_amount|currency }}</span></p>
+                <p class="text-sm text-gray-500 text-center">{% trans "Đơn hàng" %} #{{ order.id }}</p>
+                
+                <div class="mt-6 flex flex-col items-center">
+                    <div id="countdown" class="text-sm text-gray-500 mb-2">{% trans "Mã QR có hiệu lực trong:" %} <span id="time-remaining">15:00</span></div>
+                    <div id="payment-status" class="px-2 py-1 text-yellow-800 text-xs font-medium bg-yellow-100 rounded-full">
+                        {% trans "Đang chờ thanh toán" %}
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Lấy các phần tử DOM
+    var paymentBtn = document.getElementById('payment-btn');
+    var paymentModal = document.getElementById('payment-modal');
+    var closeModal = document.getElementById('close-modal');
+    var cancelPayment = document.getElementById('cancel-payment');
+    var timeRemaining = document.getElementById('time-remaining');
+    var statusElement = document.getElementById('payment-status');
+    var orderId = "{{ order.id }}";
+    
+    // Biến toàn cục
+    var countdownInterval = null;
+    var checkPaymentStatusInterval = null;
+    var timeLeft = 15 * 60; // 15 phút
+    
+    // Xử lý sự kiện nút thanh toán
+    if (paymentBtn) {
+        paymentBtn.addEventListener('click', function() {
+            paymentModal.classList.remove('hidden');
+            startCountdown();
+            checkPaymentStatusInterval = setInterval(function() {
+                checkPaymentStatus();
+            }, 5000);
+        });
+    }
+    
+    // Xử lý sự kiện đóng modal
+    if (closeModal) {
+        closeModal.addEventListener('click', function() {
+            paymentModal.classList.add('hidden');
+            if (countdownInterval) clearInterval(countdownInterval);
+            if (checkPaymentStatusInterval) clearInterval(checkPaymentStatusInterval);
+        });
+    }
+    
+    // Xử lý sự kiện hủy thanh toán
+    if (cancelPayment) {
+        cancelPayment.addEventListener('click', function() {
+            paymentModal.classList.add('hidden');
+            if (countdownInterval) clearInterval(countdownInterval);
+            if (checkPaymentStatusInterval) clearInterval(checkPaymentStatusInterval);
+        });
+    }
+    
+    // Hàm bắt đầu đếm ngược
+    function startCountdown() {
+        updateCountdown();
+        countdownInterval = setInterval(function() {
+            updateCountdown();
+        }, 1000);
+    }
+    
+    // Hàm cập nhật đếm ngược
+    function updateCountdown() {
+        if (timeLeft <= 0) {
+            if (countdownInterval) clearInterval(countdownInterval);
+            if (checkPaymentStatusInterval) clearInterval(checkPaymentStatusInterval);
+            timeRemaining.textContent = '{% trans "Hết hạn" %}';
+            statusElement.className = 'px-2 py-1 text-red-800 text-xs font-medium bg-red-100 rounded-full';
+            statusElement.textContent = '{% trans "Mã QR hết hạn" %}';
+            return;
+        }
+        
+        var minutes = Math.floor(timeLeft / 60);
+        var seconds = timeLeft % 60;
+        var formattedSeconds = seconds < 10 ? '0' + seconds : seconds;
+        timeRemaining.textContent = minutes + ':' + formattedSeconds;
+        timeLeft--;
+    }
+    
+    // Hàm kiểm tra trạng thái thanh toán
+    function checkPaymentStatus() {
+        fetch('/orders/payment/check/' + orderId + '/')
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(data) {
+                if (data.status === 'completed') {
+                    if (countdownInterval) clearInterval(countdownInterval);
+                    if (checkPaymentStatusInterval) clearInterval(checkPaymentStatusInterval);
+                    statusElement.className = 'px-2 py-1 text-green-800 text-xs font-medium bg-green-100 rounded-full';
+                    statusElement.textContent = '{% trans "Thanh toán thành công" %}';
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 2000);
+                } else if (data.status === 'cancelled') {
+                    if (countdownInterval) clearInterval(countdownInterval);
+                    if (checkPaymentStatusInterval) clearInterval(checkPaymentStatusInterval);
+                    statusElement.className = 'px-2 py-1 text-red-800 text-xs font-medium bg-red-100 rounded-full';
+                    statusElement.textContent = '{% trans "Đơn hàng đã bị hủy" %}';
+                }
+            })
+            .catch(function(error) {
+                console.error('Error checking payment status:', error);
+            });
+    }
+});
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        {% if order.status == 'pending' and order.payment_status == 'pending' %}
+        // Khởi tạo bộ đếm thời gian
+        let timeLeft = 15 * 60; // 15 phút
+        const timerDisplay = document.getElementById('time-remaining');
+        const paymentStatus = document.getElementById('payment-status');
+        
+        // Hàm cập nhật bộ đếm
+        function updateTimer() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                timerDisplay.textContent = '00:00';
+                paymentStatus.textContent = 'Hết thời gian';
+                paymentStatus.classList.remove('bg-yellow-100', 'text-yellow-800');
+                paymentStatus.classList.add('bg-red-100', 'text-red-800');
+            }
+            
+            timeLeft -= 1;
+        }
+        
+        // Cập nhật bộ đếm mỗi giây
+        updateTimer();
+        const timerInterval = setInterval(updateTimer, 1000);
+        
+        // Kiểm tra trạng thái thanh toán mỗi 5 giây
+        const checkPaymentStatus = async () => {
+            try {
+                const response = await fetch(`{% url 'orders:check_payment_status' order.id %}`);
+                const data = await response.json();
+                
+                if (data.status === 'completed') {
+                    clearInterval(timerInterval);
+                    clearInterval(statusInterval);
+                    
+                    paymentStatus.textContent = 'Thanh toán thành công';
+                    paymentStatus.classList.remove('bg-yellow-100', 'text-yellow-800');
+                    paymentStatus.classList.add('bg-green-100', 'text-green-800');
+                    
+                    // Tự động chuyển hướng sau 2 giây
+                    setTimeout(() => {
+                        window.location.href = data.redirect_url;
+                    }, 2000);
+                } else if (data.status === 'cancelled') {
+                    clearInterval(timerInterval);
+                    clearInterval(statusInterval);
+                    
+                    paymentStatus.textContent = 'Đơn hàng đã bị hủy';
+                    paymentStatus.classList.remove('bg-yellow-100', 'text-yellow-800');
+                    paymentStatus.classList.add('bg-red-100', 'text-red-800');
+                }
+            } catch (error) {
+                console.error('Lỗi kiểm tra trạng thái thanh toán:', error);
+            }
+        };
+        
+        // Kiểm tra ngay lập tức và sau đó mỗi 5 giây
+        checkPaymentStatus();
+        const statusInterval = setInterval(checkPaymentStatus, 5000);
+        {% endif %}
+    });
+</script>
 {% endblock %} 

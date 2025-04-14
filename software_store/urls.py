@@ -20,17 +20,23 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from products.views import ProductListView 
+from django.conf.urls.i18n import i18n_patterns
+from django.utils.translation import gettext_lazy as _
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('accounts/', include('accounts.urls')),
-    path('products/', include('products.urls')),
-    path('orders/', include('orders.urls')),
-    path('payments/', include('payments.urls')),
-    path('reviews/', include('reviews.urls')),
-    
-    path('', ProductListView.as_view(), name='home'),
+    path('i18n/', include('django.conf.urls.i18n')),
 ]
+
+urlpatterns += i18n_patterns(
+    path(_('admin/'), admin.site.urls),
+    path('accounts/', include('accounts.urls', namespace='accounts')),
+    path('', include('products.urls')),
+    path(_('orders/'), include('orders.urls')),
+    path(_('payments/'), include('payments.urls')),
+    path(_('reviews/'), include('reviews.urls')),
+    path(_('cart/'), include('cart.urls')),
+    prefix_default_language=False
+)
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

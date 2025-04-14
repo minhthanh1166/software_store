@@ -1,5 +1,5 @@
-from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 # Create your models here.
@@ -8,9 +8,11 @@ class User(AbstractUser):
     Mở rộng model User mặc định của Django
     """
     email = models.EmailField(_('email address'), unique=True)
-    phone_number = models.CharField(_('phone number'), max_length=15, unique=True)
-    address = models.CharField(_('address'), max_length=255, blank=True, null=True)
-    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
+    phone_number = models.CharField(_('phone number'), max_length=15, unique=True, null=True, blank=True)
+    avatar = models.ImageField(_('avatar'), upload_to='avatars/', null=True, blank=True)
+    address = models.TextField(_('address'), null=True, blank=True)
+    company_name = models.CharField(_('company name'), max_length=100, null=True, blank=True)
+    company_website = models.URLField(_('company website'), null=True, blank=True)
     
     # Bắt buộc phải xác nhận email để sử dụng tài khoản
     is_email_verified = models.BooleanField(default=False)
@@ -18,10 +20,6 @@ class User(AbstractUser):
     # Fields cho việc theo dõi
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
-    # Bổ sung nếu cần quản lý khách hàng của một công ty phát triển phần mềm
-    company_name = models.CharField(_('company name'), max_length=255, blank=True, null=True)
-    company_website = models.URLField(_('company website'), blank=True, null=True)
     
     groups = models.ManyToManyField(
         'auth.Group',
@@ -46,5 +44,9 @@ class User(AbstractUser):
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']
     
+    class Meta:
+        verbose_name = _('user')
+        verbose_name_plural = _('users')
+    
     def __str__(self):
-        return self.email
+        return self.username

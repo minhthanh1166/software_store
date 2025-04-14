@@ -1,6 +1,6 @@
 from django import forms
 from django.utils.translation import gettext_lazy as _
-from .models import Category, Product, ProductScreenshot
+from .models import Category, Product, ProductScreenshot, Review
 
 class CategoryForm(forms.ModelForm):
     class Meta:
@@ -60,4 +60,14 @@ class ProductSearchForm(forms.Form):
         required=False,
         min_value=0,
         widget=forms.NumberInput(attrs={'placeholder': _('Max price')})
-    ) 
+    )
+
+class ReviewForm(forms.ModelForm):
+    class Meta:
+        model = Review
+        fields = ['rating', 'title', 'content']
+        widgets = {
+            'rating': forms.RadioSelect(),
+            'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nhập tiêu đề đánh giá'}),
+            'content': forms.Textarea(attrs={'class': 'form-control', 'rows': 5, 'placeholder': 'Nhập nội dung đánh giá'})
+        } 

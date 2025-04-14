@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+from django.utils.translation import gettext_lazy as _
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -42,7 +44,7 @@ INSTALLED_APPS = [
     "reviews",   # Custom app for reviews
     "orders",    # Custom app for orders
     "payments",  # Custom app for payments
-    "core"
+    "cart",      # Custom app for cart
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
@@ -66,9 +68,12 @@ TEMPLATES = [
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
+                "django.template.context_processors.debug",
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "orders.context_processors.cart_info",
+                "cart.context_processors.cart_processor",
             ],
         },
     },
@@ -110,13 +115,38 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = "en-us"
-
-TIME_ZONE = "UTC"
-
 USE_I18N = True
-
+USE_L10N = True
 USE_TZ = True
+
+LANGUAGES = [
+    ('vi', _('Vietnamese')),
+    ('en', _('English')),
+]
+
+LOCALE_PATHS = [
+    os.path.join(BASE_DIR, 'locale'),
+]
+
+# Currency formatting
+CURRENCY_LOCALE = {
+    'vi': {
+        'code': 'VND',
+        'symbol': '₫',
+        'position': 'after',
+        'decimal_places': 0,
+        'thousands_sep': '.',
+        'decimal_sep': ',',
+    },
+    'en': {
+        'code': 'VND',
+        'symbol': '₫',
+        'position': 'after',
+        'decimal_places': 0,
+        'thousands_sep': '.',
+        'decimal_sep': ',',
+    },
+}
 
 
 # Static files (CSS, JavaScript, Images)
@@ -128,3 +158,22 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Base URL for absolute URLs
+BASE_URL = 'http://127.0.0.1:8000'
+
+# SePay settings
+SEPAY_API_KEY = 'test_key'
+SEPAY_API_SECRET = 'test_secret'
+SEPAY_MERCHANT_ID = 'test_merchant'
+SEPAY_SECRET_KEY = 'test_secret_key'
+SEPAY_USER_API_KEY = os.environ.get('SEPAY_USER_API_KEY', 'test_user_api_key')
+SEPAY_BASE_URL = 'https://sepay.example.com'
+SEPAY_RETURN_URL = f"{BASE_URL}/orders/payment/check/"
+SEPAY_NOTIFY_URL = f"{BASE_URL}/orders/payment/notify/"
+SEPAY_CANCEL_URL = f"{BASE_URL}/orders/"
+
+# Bank account info for SePay QR code
+SEPAY_BANK_NAME = 'BIDV'
+SEPAY_ACCOUNT_NUMBER = '96247TT123'
+SEPAY_ACCOUNT_HOLDER = 'NGUYEN DUY'

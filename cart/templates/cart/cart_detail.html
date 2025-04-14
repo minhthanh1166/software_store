@@ -1,0 +1,194 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load static %}
+{% load currency_tags %}
+
+{% block title %}{% trans "Giỏ hàng của bạn" %}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .cart-item {
+    @apply transition-all duration-300 ease-in-out;
+  }
+  .cart-item.removing {
+    @apply opacity-0 transform -translate-y-4;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+  <h1 class="text-3xl font-bold mb-8 text-center text-gray-800">{% trans "Giỏ hàng của bạn" %}</h1>
+  
+  {% if cart_items %}
+    <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+      <!-- Cart items header -->
+      <div class="bg-gray-50 p-4 border-b border-gray-200 hidden md:grid md:grid-cols-10 gap-4 font-medium text-gray-600">
+        <div class="col-span-6">{% trans "Sản phẩm" %}</div>
+        <div class="col-span-2 text-center">{% trans "Giá" %}</div>
+        <div class="col-span-2 text-end">{% trans "Hành động" %}</div>
+      </div>
+      
+      <!-- Cart items -->
+      <div id="cart-items-container">
+        {% for item in cart_items %}
+          <div class="cart-item p-4 border-b border-gray-200 grid grid-cols-1 md:grid-cols-10 gap-4 items-center" data-item-id="{{ item.id }}">
+            <!-- Product info -->
+            <div class="col-span-6 flex space-x-4">
+              <div class="w-20 h-20 flex-shrink-0">
+                {% if item.product.image %}
+                  <img src="{{ item.product.image.url }}" alt="{{ item.product.name }}" class="w-full h-full object-cover rounded">
+                {% else %}
+                  <div class="w-full h-full bg-gray-200 rounded flex items-center justify-center">
+                    <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                  </div>
+                {% endif %}
+              </div>
+              <div>
+                <h3 class="font-medium text-gray-800">{{ item.product.name }}</h3>
+                <p class="text-sm text-gray-500">{{ item.product.category }}</p>
+              </div>
+            </div>
+            
+            <!-- Price -->
+            <div class="col-span-2 text-center">
+              <span class="md:hidden font-medium text-gray-600">{% trans "Price:" %} </span>
+              <span class="font-medium text-gray-800">{{ item.product.price|currency }}</span>
+            </div>
+            
+            <!-- Remove -->
+            <div class="col-span-2 flex justify-end items-center">
+              <form action="{% url 'cart:remove_from_cart' item.id %}" method="post" class="remove-item-form">
+                {% csrf_token %}
+                <button type="submit" class="text-red-500 hover:text-red-700">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                  </svg>
+                </button>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+      
+      <!-- Cart summary -->
+      <div class="p-6 bg-gray-50">
+        <div class="flex justify-between items-center mb-4">
+          <span class="text-lg font-medium text-gray-600">{% trans "Subtotal" %}</span>
+          <span class="text-xl font-bold text-gray-800" id="cart-total">{{ cart.total|currency }}</span>
+        </div>
+        
+        <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 justify-between">
+          <form action="{% url 'cart:clear_cart' %}" method="post" id="clear-cart-form">
+            {% csrf_token %}
+            <button type="submit" class="w-full md:w-auto bg-white border border-gray-300 rounded-md py-2 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              {% trans "Xóa giỏ hàng" %}
+            </button>
+          </form>
+          
+          <a href="{% url 'products:list' %}" class="w-full md:w-auto bg-blue-100 border border-blue-300 rounded-md py-2 px-4 text-sm font-medium text-blue-700 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 text-center">
+            {% trans "Tiếp tục mua hàng" %}
+          </a>
+          
+          <a href="{% url 'orders:cart' %}" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white rounded-md py-2 px-6 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 text-center">
+            {% trans "Thanh toán" %}
+          </a>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <div class="text-center py-16 bg-white rounded-lg shadow-lg">
+      <svg class="w-20 h-20 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+      </svg>
+      <h2 class="text-2xl font-bold text-gray-800 mb-4">{% trans "Your cart is empty" %}</h2>
+      <p class="text-gray-600 mb-8">{% trans "Looks like you haven't added any products to your cart yet." %}</p>
+      <a href="{% url 'products:list' %}" class="bg-blue-600 hover:bg-blue-700 text-white rounded-md py-2 px-6 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500">
+        {% trans "Start Shopping" %}
+      </a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Remove item handlers with animation
+    const removeForms = document.querySelectorAll('.remove-item-form');
+    removeForms.forEach(form => {
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const itemElement = form.closest('.cart-item');
+        const itemId = itemElement.dataset.itemId;
+        
+        // Add removing animation class
+        itemElement.classList.add('removing');
+        
+        // Submit the form after animation
+        setTimeout(() => {
+          const formData = new FormData(form);
+          
+          fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest'
+            }
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              itemElement.remove();
+              updateCartTotal(data.cart_total);
+              
+              // If cart is empty, reload the page
+              if (data.cart_count === 0) {
+                window.location.reload();
+              }
+            }
+          });
+        }, 300);
+      });
+    });
+    
+    // Clear cart with confirmation
+    const clearCartForm = document.getElementById('clear-cart-form');
+    if (clearCartForm) {
+      clearCartForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        if (confirm('{% trans "Are you sure you want to clear your cart?" %}')) {
+          const formData = new FormData(clearCartForm);
+          
+          fetch(clearCartForm.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest'
+            }
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              window.location.reload();
+            }
+          });
+        }
+      });
+    }
+    
+    // Update cart total
+    function updateCartTotal(total) {
+      const cartTotalElement = document.getElementById('cart-total');
+      if (cartTotalElement) {
+        // Format the total as VND currency (add dot for thousands and ₫ symbol)
+        const formattedTotal = new Intl.NumberFormat('vi-VN').format(total) + '₫';
+        cartTotalElement.textContent = formattedTotal;
+      }
+    }
+  });
+</script>
+{% endblock %} 
