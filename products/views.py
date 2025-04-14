@@ -6,13 +6,14 @@ from django.urls import reverse_lazy, reverse
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Q
 from django.contrib import messages
-from django.http import HttpResponse, FileResponse
-from .models import Category, Product, Review
+from django.http import HttpResponse, FileResponse, JsonResponse
+from .models import Category, Product, Review, Wishlist
 from .forms import ProductForm, ProductScreenshotForm, ProductSearchForm, ReviewForm
 from orders.models import Order, OrderItem
 import os
 from django.conf import settings
 import mimetypes
+from django.views.decorators.http import require_POST
 
 class ProductListView(ListView):
     model = Product
@@ -71,6 +72,14 @@ class ProductDetailView(DetailView):
             category=product.category,
             is_active=True
         ).exclude(id=product.id)[:4]
+        
+        # Kiểm tra xem sản phẩm đã được thêm vào danh sách yêu thích chưa
+        if self.request.user.is_authenticated:
+            context['is_favorited'] = Wishlist.objects.filter(
+                user=self.request.user,
+                product=product
+            ).exists()
+        
         return context
 
 class ProductCreateView(LoginRequiredMixin, CreateView):
@@ -213,3 +222,24 @@ def download_product(request, product_id, order_id):
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     
     return response
+
+@login_required
+@require_POST
+def toggle_favorite(request, product_id):
+    product = get_object_or_404(Product, id=product_id)
+    wishlist_item, created = Wishlist.objects.get_or_create(
+        user=request.user,
+        product=product
+    )
+    
+    if not created:
+        wishlist_item.delete()
+        is_favorite = False
+    else:
+        is_favorite = True
+        
+    return JsonResponse({
+        'status': 'success',
+        'is_favorite': is_favorite,
+        'favorite_count': product.wishlisted_by.count()
+    })

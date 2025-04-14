@@ -1,15 +1,162 @@
 {% extends 'base.html' %}
 {% load static %}
 {% load currency %}
+{% load product_extras %}
 
 {% block title %}{{ product.name }} - Software Store{% endblock %}
 
 {% block content %}
+<!-- Hidden CSRF token form to use in AJAX requests -->
+<form id="csrf-form" style="display: none;">
+  {% csrf_token %}
+</form>
+
+<!-- Global notification container -->
+<div id="notification-container" class="fixed bottom-4 right-4 z-50 flex flex-col space-y-2"></div>
+
+<style>
+    .rating-distribution {
+        margin-top: 1rem;
+        max-width: 600px;
+        background-color: white;
+        padding: 1rem;
+        border-radius: 0.5rem;
+    }
+    
+    .rating-bar {
+        display: flex;
+        align-items: center;
+        margin-bottom: 0.75rem;
+        background-color: #f9fafb;
+        border-radius: 0.5rem;
+        padding: 0.5rem;
+    }
+    
+    .rating-label {
+        width: 60px;
+        font-size: 0.875rem;
+        color: #4B5563;
+        font-weight: 500;
+    }
+    
+    .bar-container {
+        flex: 1;
+        height: 12px;
+        background-color: #E5E7EB;
+        border-radius: 9999px;
+        margin: 0 1rem;
+        overflow: hidden;
+    }
+    
+    .bar {
+        height: 100%;
+        background-color: #FBBF24;
+        border-radius: 9999px;
+        transition: width 0.3s ease;
+    }
+    
+    .rating-count {
+        width: 40px;
+        font-size: 0.875rem;
+        color: #4B5563;
+        text-align: right;
+        font-weight: 500;
+    }
+
+    .rating-summary {
+        margin-bottom: 1rem;
+    }
+    
+    .reviews-list {
+        margin-top: 2rem;
+    }
+    
+    .review-item {
+        border-top: 1px solid #E5E7EB;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
+    
+    .heart-button {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        background-color: white;
+        border-radius: 9999px;
+        padding: 0.5rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        z-index: 10;
+        transition: transform 0.15s ease;
+    }
+    
+    .heart-button:hover {
+        transform: scale(1.1);
+    }
+    
+    .heart-button svg {
+        width: 24px;
+        height: 24px;
+        transition: fill 0.2s ease, color 0.2s ease;
+    }
+    
+    .heart-button.favorited svg {
+        fill: #EF4444;
+        color: #EF4444;
+    }
+    
+    /* Toast notification styling */
+    .toast-notification {
+        padding: 0.75rem 1rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        max-width: 320px;
+        opacity: 0;
+        transform: translateY(1rem);
+        transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    
+    .toast-notification.show {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    
+    .toast-notification.success {
+        background-color: #10B981;
+        color: white;
+    }
+    
+    .toast-notification.error {
+        background-color: #EF4444;
+        color: white;
+    }
+    
+    .toast-notification.info {
+        background-color: #3B82F6;
+        color: white;
+    }
+    
+    .toast-notification .toast-icon {
+        margin-right: 0.5rem;
+        flex-shrink: 0;
+    }
+</style>
+
 <div class="bg-white">
     <div class="max-w-2xl mx-auto py-16 px-4 sm:py-24 sm:px-6 lg:max-w-7xl lg:px-8">
         <div class="lg:grid lg:grid-cols-2 lg:gap-x-8 lg:items-start">
             <!-- Image gallery -->
-            <div class="flex flex-col">
+            <div class="flex flex-col relative">
+                <!-- Favorite button -->
+                {% if user.is_authenticated %}
+                <button id="favorite-button" class="heart-button {% if is_favorited %}favorited{% endif %}" data-product-id="{{ product.id }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="{% if is_favorited %}currentColor{% else %}none{% endif %}" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    </svg>
+                </button>
+                {% endif %}
+                
                 <div class="w-full aspect-w-1 aspect-h-1 rounded-lg overflow-hidden">
                     <img src="{{ product.thumbnail.url }}" alt="{{ product.name }}" class="w-full h-full object-center object-cover">
                 </div>
@@ -33,61 +180,51 @@
                     <p class="text-3xl text-gray-900">{{ product.price|currency }}</p>
                 </div>
 
-                <!-- Reviews -->
-                <div class="mt-3">
-                    <h3 class="sr-only">Reviews</h3>
+                <!-- Product rating summary -->
+                <div class="mt-6">
                     <div class="flex items-center">
                         <div class="flex items-center">
                             {% for i in "12345"|make_list %}
                                 {% if forloop.counter <= product.average_rating %}
-                                    <svg class="text-yellow-400 h-5 w-5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <svg class="text-yellow-400 h-5 w-5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                         <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                                     </svg>
                                 {% else %}
-                                    <svg class="text-gray-300 h-5 w-5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <svg class="text-gray-300 h-5 w-5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                         <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                                     </svg>
                                 {% endif %}
                             {% endfor %}
                         </div>
-                        <p class="sr-only">{{ product.average_rating }} out of 5 stars</p>
-                        <a href="#reviews" class="ml-3 text-sm font-medium text-indigo-600 hover:text-indigo-500">
-                            {{ product.reviews.count }} reviews
-                        </a>
+                        <p class="ml-2 text-sm text-gray-700">{{ product.average_rating }} trên 5 sao</p>
+                        <a href="#reviews" class="ml-4 text-sm font-medium text-indigo-600 hover:text-indigo-500">{{ product.total_reviews }} đánh giá</a>
                     </div>
                 </div>
 
                 <div class="mt-6">
-                    <h3 class="sr-only">Description</h3>
-                    <div class="text-base text-gray-700 space-y-6">
-                        {{ product.description|linebreaks }}
-                    </div>
-                </div>
-
-                <div class="mt-6">
-                    <h3 class="text-sm font-medium text-gray-900">Details</h3>
+                    <h3 class="text-sm font-medium text-gray-900">Chi tiết sản phẩm</h3>
                     <div class="mt-4">
                         <ul class="text-sm text-gray-700 space-y-2">
-                            <li><strong>Category:</strong> {{ product.category.name }}</li>
-                            <li><strong>Type:</strong> {{ product.get_software_type_display }}</li>
-                            <li><strong>License:</strong> {{ product.get_license_type_display }}</li>
-                            <li><strong>Version:</strong> {{ product.version }}</li>
-                            <li><strong>Platforms:</strong> {{ product.supported_platforms }}</li>
-                            <li><strong>File Size:</strong> {{ product.file_size }}</li>
+                            <li><strong>Danh mục:</strong> {{ product.category.name }}</li>
+                            <li><strong>Loại:</strong> {{ product.get_software_type_display }}</li>
+                            <li><strong>Giấy phép:</strong> {{ product.get_license_type_display }}</li>
+                            <li><strong>Phiên bản:</strong> {{ product.version }}</li>
+                            <li><strong>Nền tảng:</strong> {{ product.supported_platforms }}</li>
+                            <li><strong>Dung lượng:</strong> {{ product.file_size }}</li>
                         </ul>
                     </div>
                 </div>
 
                 {% if product.system_requirements %}
                     <div class="mt-6">
-                        <h3 class="text-sm font-medium text-gray-900">System Requirements</h3>
+                        <h3 class="text-sm font-medium text-gray-900">Yêu cầu hệ thống</h3>
                         <div class="mt-4">
                             <p class="text-sm text-gray-700">{{ product.system_requirements|linebreaks }}</p>
                         </div>
                     </div>
                 {% endif %}
 
-                <div class="mt-6">
+                <div class="mt-8">
                     <form method="post" action="{% url 'cart:add_to_cart' product.id %}" class="add-to-cart-form">
                         {% csrf_token %}
                         <input type="hidden" name="next" value="{{ request.path }}">
@@ -95,78 +232,129 @@
                             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
                             </svg>
-                            Add to cart
+                            Thêm vào giỏ hàng
                         </button>
                     </form>
                 </div>
 
-                {% if user.is_authenticated and user == product.developer %}
-                    <div class="mt-4 flex space-x-4">
-                        <a href="{% url 'products:update' product.id %}" class="w-1/2 bg-white border border-gray-300 rounded-md py-3 px-8 flex items-center justify-center text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                            Edit
-                        </a>
-                        <a href="{% url 'products:delete' product.id %}" class="w-1/2 bg-red-600 border border-transparent rounded-md py-3 px-8 flex items-center justify-center text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
-                            Delete
-                        </a>
-                    </div>
-                {% endif %}
+            
             </div>
         </div>
 
-        <!-- Reviews section -->
-        <div id="reviews" class="mt-16">
-            <h2 class="text-2xl font-extrabold tracking-tight text-gray-900">Customer Reviews</h2>
-            <div class="mt-6 space-y-10">
-                {% for review in product.reviews.all %}
-                    <div class="flex flex-col sm:flex-row">
-                        <div class="order-2 mt-6 sm:mt-0 sm:ml-16">
-                            <h3 class="text-sm font-medium text-gray-900">{{ review.title }}</h3>
-                            <p class="sr-only">{{ review.rating }} out of 5 stars</p>
-                            <div class="mt-3 space-y-6 text-sm text-gray-600">
-                                {{ review.content|linebreaks }}
-                            </div>
-                            {% if review.is_verified_purchase %}
-                                <p class="mt-3 text-sm text-green-600">Verified Purchase</p>
-                            {% endif %}
-                        </div>
-                        <div class="order-1 flex items-center sm:flex-col sm:items-start">
-                            <p class="text-sm font-medium text-gray-900">{{ review.user.get_full_name|default:review.user.email }}</p>
-                            <div class="ml-4 flex items-center sm:ml-0 sm:mt-2">
-                                <div class="flex items-center">
-                                    {% for i in "12345"|make_list %}
-                                        {% if forloop.counter <= review.rating %}
-                                            <svg class="text-yellow-400 h-5 w-5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                            </svg>
-                                        {% else %}
-                                            <svg class="text-gray-300 h-5 w-5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                            </svg>
-                                        {% endif %}
-                                    {% endfor %}
-                                </div>
-                            </div>
+        <!-- Reviews Section -->
+        <div id="reviews" class="mt-16 border-t border-gray-200 pt-10">
+            <h2 class="text-2xl font-bold text-gray-900 mb-8">Đánh giá từ người dùng</h2>
+            
+            <div class="lg:grid lg:grid-cols-12 lg:gap-x-8">
+                <div class="lg:col-span-4">
+                    <!-- Rating Summary -->
+                    <div class="rating-summary">
+                        <span class="text-lg font-medium text-gray-900">{{ product.average_rating }} trên 5 sao</span>
+                        <div class="flex items-center mt-1">
+                            {% for i in "12345"|make_list %}
+                                {% if forloop.counter <= product.average_rating %}
+                                    <svg class="text-yellow-400 h-5 w-5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                    </svg>
+                                {% else %}
+                                    <svg class="text-gray-300 h-5 w-5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                    </svg>
+                                {% endif %}
+                            {% endfor %}
+                            <p class="ml-3 text-sm text-gray-500">({{ product.total_reviews }} đánh giá)</p>
                         </div>
                     </div>
-                {% empty %}
-                    <p class="text-gray-500">No reviews yet.</p>
-                {% endfor %}
-            </div>
 
-            {% if user.is_authenticated %}
-                <div class="mt-10">
-                    <h3 class="text-lg font-medium text-gray-900">Write a review</h3>
-                    <a href="{% url 'reviews:create' product.id %}" class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        Write a review
-                    </a>
+                    <!-- Rating Distribution -->
+                    <div class="rating-distribution mt-6">
+                        {% for i in "54321"|make_list %}
+                            <div class="rating-bar">
+                                <span class="rating-label">{{ i }} sao</span>
+                                <div class="bar-container">
+                                    <div class="bar" style="width: {% widthratio product.rating_distribution|get_item:i 100 product.total_reviews %}%"></div>
+                                </div>
+                                <span class="rating-count">{{ product.rating_distribution|get_item:i }}</span>
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Write Review Button -->
+                    {% if user.is_authenticated %}
+                        <div class="mt-8">
+                            <a href="{% url 'reviews:create' product.id %}" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                Viết đánh giá
+                            </a>
+                        </div>
+                    {% endif %}
                 </div>
-            {% endif %}
+
+                <!-- Reviews List -->
+                <div class="mt-8 lg:mt-0 lg:col-span-8">
+                    {% if product.reviews_set.exists %}
+                        <div class="reviews-list">
+                            {% for review in product.reviews_set.all %}
+                                {% if review.is_approved %}
+                                    <div class="review-item">
+                                        <div class="flex items-center">
+                                            <div class="flex items-center">
+                                                {% for i in "12345"|make_list %}
+                                                    {% if forloop.counter <= review.rating %}
+                                                        <svg class="text-yellow-400 h-5 w-5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                                        </svg>
+                                                    {% else %}
+                                                        <svg class="text-gray-300 h-5 w-5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                                        </svg>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </div>
+                                            <p class="ml-2 text-sm font-medium text-gray-900">{{ review.user.get_full_name|default:review.user.email }}</p>
+                                            {% if review.is_verified_purchase %}
+                                                <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                    Đã mua hàng
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                        <h4 class="mt-2 text-sm font-medium text-gray-900">{{ review.title }}</h4>
+                                        <p class="mt-2 text-sm text-gray-600">{{ review.content }}</p>
+                                        <div class="mt-4 flex items-center">
+                                            <button type="button" class="helpful-button inline-flex items-center text-sm text-gray-500 hover:text-gray-900 {% if user in review.helpful_votes.all %}opacity-50 cursor-not-allowed{% endif %}" data-review-id="{{ review.id }}" {% if user in review.helpful_votes.all %}disabled{% endif %}>
+                                                <svg class="h-5 w-5 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+                                                </svg>
+                                                Hữu ích ({{ review.helpful_count }})
+                                            </button>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-12">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                            </svg>
+                            <h3 class="mt-2 text-sm font-medium text-gray-900">Chưa có đánh giá nào</h3>
+                            <p class="mt-1 text-sm text-gray-500">Hãy là người đầu tiên đánh giá sản phẩm này</p>
+                            {% if user.is_authenticated %}
+                                <div class="mt-6">
+                                    <a href="{% url 'reviews:create' product.id %}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                        Viết đánh giá
+                                    </a>
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
         </div>
 
         <!-- Related products -->
         {% if related_products %}
             <div class="mt-16">
-                <h2 class="text-2xl font-extrabold tracking-tight text-gray-900">You may also like</h2>
+                <h2 class="text-2xl font-extrabold tracking-tight text-gray-900">Sản phẩm liên quan</h2>
                 <div class="mt-6 grid grid-cols-1 gap-y-10 gap-x-6 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-8">
                     {% for product in related_products %}
                         <div class="group relative">
@@ -197,6 +385,42 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Global notification system
+        const notificationContainer = document.getElementById('notification-container');
+        
+        function showNotification(message, type = 'info', duration = 3000) {
+            const toast = document.createElement('div');
+            toast.className = `toast-notification ${type}`;
+            
+            let iconSvg = '';
+            if (type === 'success') {
+                iconSvg = '<svg class="w-5 h-5 toast-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+            } else if (type === 'error') {
+                iconSvg = '<svg class="w-5 h-5 toast-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+            } else {
+                iconSvg = '<svg class="w-5 h-5 toast-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+            }
+            
+            toast.innerHTML = iconSvg + message;
+            notificationContainer.appendChild(toast);
+            
+            // Show with animation
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 10);
+            
+            // Remove after duration
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    notificationContainer.removeChild(toast);
+                }, 300);
+            }, duration);
+            
+            return toast;
+        }
+
+        // Add to cart functionality
         const addToCartForm = document.querySelector('.add-to-cart-form');
         
         if (addToCartForm) {
@@ -226,6 +450,9 @@
                         submitButton.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
                         submitButton.classList.add('bg-green-600', 'hover:bg-green-700');
                         
+                        // Show notification
+                        showNotification('Đã thêm vào giỏ hàng thành công', 'success');
+                        
                         // Update cart count in header
                         const cartCountElement = document.querySelector('.absolute.bg-red-500');
                         if (cartCountElement) {
@@ -250,6 +477,9 @@
                         submitButton.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
                         submitButton.classList.add('bg-red-600', 'hover:bg-red-700');
                         
+                        // Show notification
+                        showNotification(data.message || 'Thêm vào giỏ hàng thất bại', 'error');
+                        
                         // Reset button after delay
                         setTimeout(() => {
                             submitButton.innerHTML = originalButtonText;
@@ -261,10 +491,130 @@
                 })
                 .catch(error => {
                     console.error('Error:', error);
+                    
+                    // Show notification
+                    showNotification('Đã xảy ra lỗi khi thêm vào giỏ hàng', 'error');
+                    
                     // Reset button on error
                     submitButton.innerHTML = originalButtonText;
                     submitButton.disabled = false;
+                    submitButton.classList.remove('bg-red-600', 'hover:bg-red-700');
+                    submitButton.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
                 });
+            });
+        }
+
+        // Handle helpful review votes
+        const helpfulButtons = document.querySelectorAll('.helpful-button');
+        helpfulButtons.forEach(button => {
+            button.addEventListener('click', async function() {
+                const reviewId = this.dataset.reviewId;
+                const csrfToken = document.querySelector('#csrf-form [name=csrfmiddlewaretoken]').value;
+                
+                // Add visual feedback immediately
+                this.classList.add('opacity-75');
+                
+                try {
+                    const response = await fetch(`{% url 'reviews:mark_helpful' '0' %}`.replace('0', reviewId), {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        // Update vote count
+                        const countText = this.querySelector('svg').nextSibling;
+                        const helpfulCount = data.helpful_count || data.helpful_votes || 0;
+                        countText.textContent = ` Hữu ích (${helpfulCount})`;
+                        
+                        // Disable button after successful vote
+                        if (data.user_voted) {
+                            this.disabled = true;
+                            this.classList.add('opacity-50', 'cursor-not-allowed');
+                            showNotification('Đánh dấu đánh giá là hữu ích thành công', 'success');
+                        } else {
+                            this.classList.remove('opacity-75');
+                            showNotification('Đã bỏ đánh dấu đánh giá là hữu ích', 'info');
+                        }
+                    } else {
+                        // Handle error response
+                        this.classList.remove('opacity-75');
+                        console.error('Error marking review as helpful:', response.statusText);
+                        showNotification('Không thể đánh dấu đánh giá là hữu ích', 'error');
+                    }
+                } catch (error) {
+                    this.classList.remove('opacity-75');
+                    console.error('Error:', error);
+                    showNotification('Đã xảy ra lỗi khi đánh dấu đánh giá', 'error');
+                }
+            });
+        });
+        
+        // Handle favorite button
+        const favoriteButton = document.getElementById('favorite-button');
+        if (favoriteButton) {
+            favoriteButton.addEventListener('click', async function(e) {
+                e.preventDefault();
+                
+                {% if not user.is_authenticated %}
+                    window.location.href = "{% url 'accounts:login' %}?next={{ request.path }}";
+                    return;
+                {% endif %}
+                
+                const productId = this.dataset.productId;
+                const csrfToken = document.querySelector('#csrf-form [name=csrfmiddlewaretoken]').value;
+                
+                // Add visual feedback immediately
+                this.classList.add('opacity-75');
+                
+                try {
+                    const response = await fetch(`{% url 'products:toggle_favorite' product.id %}`.replace('{{ product.id }}', productId), {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    
+                    const data = await response.json();
+                    this.classList.remove('opacity-75');
+                    
+                    // Update the heart icon based on the response
+                    const heartIcon = this.querySelector('svg');
+                    
+                    if (data.is_favorite) {
+                        this.classList.add('favorited');
+                        heartIcon.setAttribute('fill', 'currentColor');
+                        
+                        // Add a little animation
+                        this.classList.add('animate-pulse');
+                        setTimeout(() => {
+                            this.classList.remove('animate-pulse');
+                        }, 1000);
+                        
+                        // Show notification
+                        showNotification('Đã thêm vào danh sách yêu thích', 'success');
+                    } else {
+                        this.classList.remove('favorited');
+                        heartIcon.setAttribute('fill', 'none');
+                        
+                        // Show notification
+                        showNotification('Đã xóa khỏi danh sách yêu thích', 'info');
+                    }
+                } catch (error) {
+                    this.classList.remove('opacity-75');
+                    console.error('Error:', error);
+                    showNotification('Đã xảy ra lỗi khi thêm vào yêu thích', 'error');
+                }
             });
         }
     });

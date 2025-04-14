@@ -17,18 +17,43 @@
                 </a>
             </p>
         </div>
+        
+        {% if messages %}
+        <div class="rounded-md bg-red-50 p-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <div class="text-sm text-red-700">
+                        <ul class="list-disc pl-5 space-y-1">
+                        {% for message in messages %}
+                            <li>{{ message }}</li>
+                        {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
         <form class="mt-8 space-y-6" method="POST">
             {% csrf_token %}
             
-            {% if form.errors %}
+            {% if form.non_field_errors %}
                 <div class="rounded-md bg-red-50 p-4">
                     <div class="flex">
-                        <div class="text-sm text-red-700">
-                            {% for field in form %}
-                                {% for error in field.errors %}
-                                    <p>{{ error }}</p>
-                                {% endfor %}
-                            {% endfor %}
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <div class="text-sm text-red-700">
+                                {{ form.non_field_errors }}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -36,29 +61,45 @@
 
             <div class="rounded-md shadow-sm space-y-4">
                 <div>
-                    <label for="username" class="block text-sm font-medium text-gray-700">{% trans "Tên đăng nhập" %}</label>
-                    <input type="text" name="username" id="username" required
-                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <label for="{{ form.email.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.email.label }}</label>
+                    {{ form.email }}
+                    {% if form.email.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.email.errors.0 }}</p>
+                    {% endif %}
                 </div>
+                
                 <div>
-                    <label for="email" class="block text-sm font-medium text-gray-700">{% trans "Email" %}</label>
-                    <input type="email" name="email" id="email" required
-                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <label for="{{ form.username.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.username.label }}</label>
+                    {{ form.username }}
+                    {% if form.username.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.username.errors.0 }}</p>
+                    {% endif %}
                 </div>
+                
                 <div>
-                    <label for="phone_number" class="block text-sm font-medium text-gray-700">{% trans "Số điện thoại" %}</label>
-                    <input type="tel" name="phone_number" id="phone_number" required
-                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <label for="{{ form.phone_number.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.phone_number.label }}</label>
+                    {{ form.phone_number }}
+                    {% if form.phone_number.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.phone_number.errors.0 }}</p>
+                    {% endif %}
                 </div>
+                
                 <div>
-                    <label for="password1" class="block text-sm font-medium text-gray-700">{% trans "Mật khẩu" %}</label>
-                    <input type="password" name="password1" id="password1" required
-                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <label for="{{ form.password1.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.password1.label }}</label>
+                    {{ form.password1 }}
+                    {% if form.password1.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.password1.errors.0 }}</p>
+                    {% else %}
+                        <p class="mt-1 text-xs text-gray-500">{% trans "Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ và số" %}</p>
+                    {% endif %}
                 </div>
+                
                 <div>
-                    <label for="password2" class="block text-sm font-medium text-gray-700">{% trans "Xác nhận mật khẩu" %}</label>
-                    <input type="password" name="password2" id="password2" required
-                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <label for="{{ form.password2.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.password2.label }}</label>
+                    {{ form.password2 }}
+                    {% if form.password2.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.password2.errors.0 }}</p>
+                    {% endif %}
                 </div>
             </div>
 

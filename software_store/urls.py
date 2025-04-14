@@ -30,7 +30,7 @@ urlpatterns = [
 urlpatterns += i18n_patterns(
     path(_('admin/'), admin.site.urls),
     path('accounts/', include('accounts.urls', namespace='accounts')),
-    path('', include('products.urls')),
+    path('', include('products.urls', namespace='products')),
     path(_('orders/'), include('orders.urls')),
     path(_('payments/'), include('payments.urls')),
     path(_('reviews/'), include('reviews.urls')),

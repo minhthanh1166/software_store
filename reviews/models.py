@@ -3,6 +3,8 @@ from django.utils.translation import gettext_lazy as _
 from django.core.validators import MinValueValidator, MaxValueValidator
 from accounts.models import User
 from products.models import Product
+from django.db.models.signals import m2m_changed, post_save
+from django.dispatch import receiver
 
 class Review(models.Model):
     RATING_CHOICES = (
@@ -13,7 +15,7 @@ class Review(models.Model):
         (5, _('5 Stars')),
     )
 
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='reviews')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='reviews_set')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviews')
     rating = models.PositiveIntegerField(
         _('rating'),
@@ -23,7 +25,8 @@ class Review(models.Model):
     title = models.CharField(_('title'), max_length=200)
     content = models.TextField(_('content'))
     is_verified_purchase = models.BooleanField(_('verified purchase'), default=False)
-    helpful_votes = models.PositiveIntegerField(_('helpful votes'), default=0)
+    helpful_votes = models.ManyToManyField(User, related_name='helpful_reviews', blank=True)
+    helpful_count = models.PositiveIntegerField(_('helpful votes'), default=0)
     is_approved = models.BooleanField(_('is approved'), default=False)
     
     # Thời gian
@@ -55,3 +58,10 @@ class ReviewResponse(models.Model):
 
     def __str__(self):
         return f"Response to {self.review}"
+
+@receiver(m2m_changed, sender=Review.helpful_votes.through)
+def update_helpful_count(sender, instance, action, **kwargs):
+    if action in ['post_add', 'post_remove', 'post_clear']:
+        # Update the helpful_count field to match the number of related objects
+        instance.helpful_count = instance.helpful_votes.count()
+        instance.save(update_fields=['helpful_count'])
